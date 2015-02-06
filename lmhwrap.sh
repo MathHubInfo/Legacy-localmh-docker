@@ -4,7 +4,6 @@ lmh_repo="tkw01536/localmh"
 lmh_configfile="$HOME/.lmh_docker"
 lmh_mountdir="$(pwd)"
 
-echo $LMH_CONTENT_DIR
 if [ -d "$LMH_CONTENT_DIR" ]; then
   lmh_mountdir="$LMH_CONTENT_DIR"
 fi
@@ -51,7 +50,7 @@ When a new container is created the MathHub directory in the lmh instance will
 have to be mounted. By default, this script mounts the current directory. This
 behaviour can be overriden by setting the LMH_CONTENT_DIR environment variable
 to an existing directory.
-Example: 
+Example:
   LMH_CONTENT_DIR="\$HOME/localmh/MathHub" $0 start
     If no container exists, creates a new one with the directory
     \$HOME/localmh/MathHub used as a directory for data files. If a container
@@ -67,6 +66,22 @@ if [ "$1" == "stop" ]; then
   docker stop -t 1 $docker_pid
   exit $?
 fi
+
+
+#
+# Computing the relative directories.
+#
+lmh_pwd="$(pwd)"
+lmh_pwdcut="$(echo "$lmh_pwd" | cut -c 1-$((${#lmh_mountdir})))"
+lmh_relpath=$(pwd | cut -c $((${#lmh_mountdir} + 2))-)
+
+if [[ "$lmh_mountdir" != "$lmh_pwdcut" ]]; then
+  lmh_relpath=""
+else
+  lmh_relpath="MathHub/$lmh_relpath"
+fi
+
+
 
 #
 # For the destroy command remove the container
@@ -111,7 +126,7 @@ fi
 #
 if [ "$(docker inspect --format='{{ .State.Running }}' $docker_pid 2> /dev/null || echo 'no')" == "no" ]; then
   echo "Creating new container for lmh ..."
-  docker_pid=$(docker create $lmh_repo -v "$lmh_mountdir:/lmh_content_dir")
+  docker_pid=$(docker create -v "$lmh_mountdir:/lmh_content_dir" $lmh_repo )
   echo $docker_pid > "$lmh_configfile"
 fi
 
@@ -120,8 +135,11 @@ fi
 #
 if [ "$(docker inspect --format='{{ .State.Running }}' $docker_pid)" == "false" ]; then
   docker start $docker_pid
+
+  # Link the MathHub directory if we have to.
+  docker exec -t -i $docker_pid /bin/bash -c 'cd $HOME/localmh; if [[ -L MathHub ]]; then : ; else echo "Linking MathHub directory ..." && mv MathHub $HOME/MathHub.org && ln -s /lmh_content_dir MathHub ; fi '
 fi
 
-# and connect to it.
-docker exec -t -i $docker_pid /bin/sh -c 'cd $HOME/localmh; /bin/bash'
+
+docker exec -t -i $docker_pid /bin/sh -c "cd \$HOME/localmh/$lmh_relpath; /bin/bash"
 exit $?
