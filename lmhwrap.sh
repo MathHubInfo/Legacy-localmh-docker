@@ -37,6 +37,8 @@ fi
 if [ "$1" == "help" ]; then
   echo """LMH Wrapper Script
 
+(c) 2015 The KWARC group <kwarc.info>
+
 Usage: $0 [start|status|stop|destroy|help]
 
   start   Connects to a container for lmh. Creates a new container if it does
@@ -50,11 +52,25 @@ When a new container is created the MathHub directory in the lmh instance will
 have to be mounted. By default, this script mounts the current directory. This
 behaviour can be overriden by setting the LMH_CONTENT_DIR environment variable
 to an existing directory.
+
 Example:
   LMH_CONTENT_DIR="\$HOME/localmh/MathHub" $0 start
     If no container exists, creates a new one with the directory
     \$HOME/localmh/MathHub used as a directory for data files. If a container
     already exists, attaches to it.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
   exit 0
 fi
