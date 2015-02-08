@@ -46,7 +46,7 @@ chmod +x lmh # Make the script executable
 or
 ```bash
 cd /in/your/path/
-curl https://raw.githubusercontent.com/KWARC/localmh_docker/master/lmh.sh > lmhwrap
+curl https://raw.githubusercontent.com/KWARC/localmh_docker/master/lmh.sh > lmh
 chmod +x lmh # Make the script executable
 ```
 Feel free to use other methods to get the wrapper script. For example, you can just clone this repository and then symlink the executable. This will make updates significantly simpler.
@@ -107,7 +107,7 @@ exit # exists the shell created by lmh core
 ```
 ### Regular usage
 
-If the wrapper script is named "lmh" you can use the normal lmh commands seemlessly. The only exception from this is "lmh core" which is handled by the wrapper script only. The commands will be run inside the docker container, however it has proper access to the LMH_DATA_DIR and will automatically run commands in the right directory. If no container exists or it is not running, it will automatically be created. 
+If the wrapper script is named "lmh" you can use the normal lmh commands seemlessly. The only exception from this is "lmh core" which is handled by the wrapper script only. The commands will be run inside the docker container, however it has proper access to the LMH_DATA_DIR and will automatically run commands in the right directory. If no container exists or it is not running, it will automatically be created.
 
 For more information on the supported core commands, please run
 ```
