@@ -105,7 +105,11 @@ function command_ensure_running(){
   # Create container if it does not exist.
   if [ "$(docker inspect --format='{{ .State.Running }}' $docker_pid 2> /dev/null || echo 'no')" == "no" ]; then
     echo "Creating new container for lmh ..."
-    docker_pid=$(docker create -v "$lmh_mountdir:/lmh_content_dir" $lmh_repo )
+    if [ "$lmh_devmode" == "true" ]; then
+      docker_pid=$(docker create -v "$lmh_devdir:/lmh_dev_dir" $lmh_repo )
+    else
+      docker_pid=$(docker create -v "$lmh_mountdir:/lmh_content_dir" $lmh_repo )
+    fi
     echo $docker_pid > "$lmh_configfile"
   fi
 
@@ -113,8 +117,13 @@ function command_ensure_running(){
   if [ "$(docker inspect --format='{{ .State.Running }}' $docker_pid)" == "false" ]; then
     docker start $docker_pid > /dev/null
 
-    # Link the MathHub directory if we have to.
-    docker exec -t -i $docker_pid /bin/bash -c 'cd $HOME/localmh; if [[ -L MathHub ]]; then : ; else echo "Linking MathHub directory ..." && mv MathHub $HOME/MathHub.org && ln -s /lmh_content_dir MathHub ; fi '
+    if [ "$lmh_devmode" == "true" ]; then
+      # Link the MathHub directory if we have to.
+      docker exec -t -i $docker_pid /bin/bash -c 'cd $HOME; if [[ -L localmh ]]; then : ; else echo "Linking development mode dir. " && mv localmh localmh.org && ln -s /lmh_dev_dir localmh ; fi '
+    else
+      # Link the MathHub directory if we have to.
+      docker exec -t -i $docker_pid /bin/bash -c 'cd $HOME/localmh; if [[ -L MathHub ]]; then : ; else echo "Linking MathHub directory ..." && mv MathHub $HOME/MathHub.org && ln -s /lmh_content_dir MathHub ; fi '
+    fi
   fi
 
 }
@@ -131,7 +140,11 @@ function command_status(){
       echo "Status:         Running"
     fi
   fi
-  echo "Data directory: $lmh_mountdir"
+  if [ "$lmh_devmode" == "true" ]; then
+    echo "Dev directory: $lmh_devdir"
+  else
+    echo "Data directory: $lmh_mountdir"
+  fi
   exit 0
 }
 
@@ -280,6 +293,13 @@ function command_core(){
 # Check if we want to mount a different directory.
 if [ -d "$LMH_CONTENT_DIR" ]; then
   lmh_mountdir="$LMH_CONTENT_DIR"
+fi
+
+# For when when we do deving.
+if [ -d "$LMH_DEV_DIR" ]; then
+  lmh_devmode="true"
+  lmh_devdir="$LMH_DEV_DIR"
+  lmh_mountdir="$LMH_DEV_DIR/MathHub"
 fi
 
 # Check if we have the docker excutable

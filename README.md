@@ -72,7 +72,32 @@ To update the wrapper script, simply replace the script you installed earlier wi
 
 Before using the wrapper script, you will need to understand how it works. It creates a docker container which has lmh installed for you. This container is isolated from the host system and only has access to the LMH_CONTENT_DIR (as configured above). This has a few caveats, see below.
 
-### Caveats
+### Regular usage
+
+If the wrapper script is named "lmh" you can use the normal lmh commands seemlessly. The only exception from this is "lmh core" which is handled by the wrapper script only. The commands will be run inside the docker container, however it has proper access to the LMH_DATA_DIR and will automatically run commands in the right directory. If no container exists or it is not running, it will automatically be created.
+
+For more information on the supported core commands, please run
+```
+lmh core --help
+```
+
+You can create the docker container via running:
+```
+lmh core start
+```
+This creates the container (if it does not already exists) and creates a shell inside of it.
+You can stop the running container via:
+```
+lmh core stop
+```
+
+To destroy a container (usually not needed), use ```lmh core destroy````. Furthermore you can use
+```
+lmh core status
+```
+for some status information.
+
+### Caveats for developers
 
 Because everything is running inside a docker container, all configuration from outside the container is not maintained. If you want to use git (which is essential to the way lmh works), you will have to reconfigure the git inside the container. Each time you destroy the container you will have to repeat this procedure. You can do this via calling:
 ```
@@ -105,31 +130,10 @@ chmod 600 ~/.ssh/id_rsa
 chmod 600 ~/.ssh/id_rsa.pub
 exit # exists the shell created by lmh core
 ```
-### Regular usage
 
-If the wrapper script is named "lmh" you can use the normal lmh commands seemlessly. The only exception from this is "lmh core" which is handled by the wrapper script only. The commands will be run inside the docker container, however it has proper access to the LMH_DATA_DIR and will automatically run commands in the right directory. If no container exists or it is not running, it will automatically be created.
+### The lmh core developer mode
 
-For more information on the supported core commands, please run
-```
-lmh core --help
-```
-
-You can create the docker container via running:
-```
-lmh core start
-```
-This creates the container (if it does not already exists) and creates a shell inside of it.
-You can stop the running container via:
-```
-lmh core stop
-```
-
-To destroy a container (usually not needed), use ```lmh core destroy````. Furthermore you can use
-```
-lmh core status
-```
-for some status information.
-
+For lmh core developers, you can set the variable LMH_DEV_DIR to a local directory with an lmh clone. This will use that clone inside the docker container and allow development of the lmh core more easily. You will have to re-run lmh setup. 
 
 ## License
 
