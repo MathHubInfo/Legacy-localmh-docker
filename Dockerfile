@@ -15,7 +15,7 @@ RUN apt-get update && apt-get install -y python python-dev python-pip git subver
 #
 # Install lmh itself
 #
-RUN git clone https://github.com/KWARC/localmh $HOME/localmh; pip install beautifulsoup4 psutil pyapi-gitlab; ln -s $HOME/localmh/bin/lmh /usr/local/bin/lmh
+RUN git clone https://github.com/KWARC/localmh $HOME/localmh; pip install beautifulsoup4 psutil pyapi-gitlab; ln -s $HOME/localmh/bin/lmh /usr/local/bin/lmh; lmh setup --no-firstrun --install all
 
 #
 # And run the tail command, to do nothing
