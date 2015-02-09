@@ -8,7 +8,7 @@
 #
 # CONFIGURATION
 #
-lmh_repo="tkw01536/localmh" # docker repository for lmh
+lmh_repo="kwarc/localmh" # docker repository for lmh
 lmh_configfile="$HOME/.lmh_docker" # file to store state in.
 lmh_mountdir="$(pwd)" # Default directory to mount.
 
@@ -200,6 +200,9 @@ function command_stop(){
 
 function run_wrapper_lmh(){
   # Run the lmh inside
+
+  command_ensure_running
+
   lmh_line="lmh $@"
   docker exec -t -i $docker_pid /bin/sh -c "cd \$HOME/localmh/$lmh_relpath; $lmh_line"
   exit $?

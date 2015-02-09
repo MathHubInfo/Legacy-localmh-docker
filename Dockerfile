@@ -10,7 +10,7 @@ MAINTAINER Tom Wiesing <tkw01536@gmail.com>
 # This might take a while
 #
 
-RUN apt-get update && apt-get install -y python python-dev python-pip git subversion texlive cpanminus libxml2-dev libxslt-dev libgdbm-dev openjdk-7-jre-headless && apt-get clean
+RUN apt-get update && apt-get install -y python python-dev python-pip git subversion texlive-full cpanminus libxml2-dev libxslt-dev libgdbm-dev openjdk-7-jre-headless && apt-get clean
 
 #
 # Install lmh itself
