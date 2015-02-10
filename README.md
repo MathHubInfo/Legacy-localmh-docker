@@ -36,6 +36,7 @@ Because docker needs some kernel-specific features, to run docker on MacOSX you 
 Whenever running the wrapper script, please make sure that the boot2docker VM is running.
 
 ### Installing the wrapper script
+  docker exec $docker_pid  /bin/sh -c "chown -R $uid:$gid /path/to/localmh"
 
 First, download and store the wrapper script in a location that is contained in your $PATH. (Note: it is recommended to remove any legacy lmh installation first via ```[sudo] pip uninstall lmh```. )
 ```bash
@@ -99,6 +100,12 @@ for some status information.
 
 ### Caveats for developers
 
+#### The permissions
+
+Inside the docker container everything is running under the user root with uid and gid 0. This means that (unless you are using boot2docker) all files created inside the docker container are owned by the root user. To fix this at any point, you can run ```lmh core fp``` to set the owner of the files to the (real) user running it. 
+
+#### The configuration
+
 Because everything is running inside a docker container, all configuration from outside the container is not maintained. If you want to use git (which is essential to the way lmh works), you will have to reconfigure the git inside the container. Each time you destroy the container you will have to repeat this procedure. You can do this via calling:
 ```
 lmh core start
@@ -131,7 +138,7 @@ chmod 600 ~/.ssh/id_rsa.pub
 exit # exists the shell created by lmh core
 ```
 
-Depending on your system configuration the files created inside the docker container might be owned by the root user on the real system causing permission problems. 
+Depending on your system configuration the files created inside the docker container might be owned by the root user on the real system causing permission problems.
 
 ### The lmh core developer mode
 

@@ -49,7 +49,7 @@ function command_help()
 
 (c) 2015 The KWARC group <kwarc.info>
 
-Usage: $0 core [start|status|stop|destroy|put|get|help] [--help] [ARGS]
+Usage: $0 core [start|status|stop|destroy|put|get|fp|help] [--help] [ARGS]
 
   start   Connects to a container for lmh. Creates a new container if it does
           not already exist.
@@ -59,6 +59,7 @@ Usage: $0 core [start|status|stop|destroy|put|get|help] [--help] [ARGS]
   put     Copy files from the host system to the docker container.
   get     Copy files from the docker container to the host system.
   cpssh   Copy over the ssh keys from the host system.
+  fp      Fix permissions of the mounted directries.
   help    Displays this help message.
   --help  Alias for $0 core help
 
@@ -93,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 function command_unknown(){
   echo """$0 core: Unknown command ${1}
 
-Usage: $0 core [start|cp|status|stop|destroy|put|get|cpssh|help] [--help] [ARGS]
+Usage: $0 core [start|cp|status|stop|destroy|put|get|cpssh|fp|help] [--help] [ARGS]
 
 See $0 core --help for more information. """ >&2
   exit 1
@@ -104,11 +105,11 @@ function command_ensure_running(){
 
   # Create container if it does not exist.
   if [ "$(docker inspect --format='{{ .State.Running }}' $docker_pid 2> /dev/null || echo 'no')" == "no" ]; then
-    echo "Creating new container for lmh ..."
+    echo "Creating new container. "
     if [ "$lmh_devmode" == "true" ]; then
-      docker_pid=$(docker create -v "$lmh_devdir:/lmh_dev_dir" $lmh_repo )
+      docker_pid=$(docker create -v "$lmh_devdir:/path/to/localmh" $lmh_repo )
     else
-      docker_pid=$(docker create -v "$lmh_mountdir:/lmh_content_dir" $lmh_repo )
+      docker_pid=$(docker create -v "$lmh_mountdir:/path/to/localmh/MathHub" $lmh_repo )
     fi
     echo $docker_pid > "$lmh_configfile"
   fi
@@ -119,10 +120,10 @@ function command_ensure_running(){
 
     if [ "$lmh_devmode" == "true" ]; then
       # Link the MathHub directory if we have to.
-      docker exec -t -i $docker_pid /bin/bash -c 'cd $HOME; if [[ -L localmh ]]; then : ; else echo "Linking development mode dir. " && mv localmh localmh.org && ln -s /lmh_dev_dir localmh ; fi '
+      docker exec -t -i $docker_pid /bin/bash -c 'cd $HOME; if [[ -L localmh ]]; then : ; else echo "Linking localmh directory in development mode. " && mv localmh localmh.org && ln -s /path/to/localmh localmh ; fi '
     else
       # Link the MathHub directory if we have to.
-      docker exec -t -i $docker_pid /bin/bash -c 'cd $HOME/localmh; if [[ -L MathHub ]]; then : ; else echo "Linking MathHub directory ..." && mv MathHub $HOME/MathHub.org && ln -s /lmh_content_dir MathHub ; fi '
+      docker exec -t -i $docker_pid /bin/bash -c 'cd $HOME/localmh; if [[ -L MathHub ]]; then : ; else echo "Linking localmh/MathHub directory mode. " && mv MathHub $HOME/MathHub.org && ln -s /path/to/localmh/MathHub MathHub ; fi '
     fi
   fi
 
@@ -235,6 +236,20 @@ Copies over the ssh keys from the host system to the container.
   exit $?
 }
 
+function command_fp(){
+  # fix permissions in the mounted directory.
+
+  command_ensure_running
+
+  # get id and uid
+  uid="$(id -u)"
+  gid="$(id -g)"
+
+  # run the command.
+  docker exec $docker_pid  /bin/sh -c "chown -R $uid:$gid /path/to/localmh"
+  exit $?
+}
+
 function command_destroy(){
   # Destroys the lmh container
   docker rm -f $docker_pid
@@ -282,6 +297,11 @@ function command_core(){
 
   if [ "${1}" == "cpssh" ]; then
     command_cpssh "${2}" "${3}"
+    exit 0
+  fi
+
+  if [ "${1}" == "fp" ]; then
+    command_fp
     exit 0
   fi
 
