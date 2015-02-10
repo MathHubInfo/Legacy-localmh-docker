@@ -131,9 +131,11 @@ chmod 600 ~/.ssh/id_rsa.pub
 exit # exists the shell created by lmh core
 ```
 
+Depending on your system configuration the files created inside the docker container might be owned by the root user on the real system causing permission problems. 
+
 ### The lmh core developer mode
 
-For lmh core developers, you can set the variable LMH_DEV_DIR to a local directory with an lmh clone. This will use that clone inside the docker container and allow development of the lmh core more easily. You will have to re-run lmh setup. 
+For lmh core developers, you can set the variable LMH_DEV_DIR to a local directory with an lmh clone. This will use that clone inside the docker container and allow development of the lmh core more easily. You will have to re-run lmh setup.
 
 ## License
 
