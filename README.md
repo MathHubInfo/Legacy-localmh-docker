@@ -100,9 +100,20 @@ for some status information.
 
 ### Caveats for developers
 
+#### The gist of it
+
+(If you haven't done this before, please read the sections below. Otherwise just copy these commands. )
+```
+# Whenever you create a new container
+lmh core put $HOME/.gitconfig /root/.gitconfig
+lmh core cpssh
+# Whenever permissions are wrong.
+lmh core fp
+```
+
 #### The permissions
 
-Inside the docker container everything is running under the user root with uid and gid 0. This means that (unless you are using boot2docker) all files created inside the docker container are owned by the root user. To fix this at any point, you can run ```lmh core fp``` to set the owner of the files to the (real) user running it. 
+Inside the docker container everything is running under the user root with uid and gid 0. This means that (unless you are using boot2docker) all files created inside the docker container are owned by the root user. To fix this at any point, you can run ```lmh core fp``` to set the owner of the files to the (real) user running it.
 
 #### The configuration
 
@@ -112,14 +123,25 @@ lmh core start
 ```
 to open a regular shell inside the container. Then you can use normal git commands to configure git properly.
 
+If you want to have proper commits you definitly want to run:
+```
+git config --global user.name "Your Name"
+git config --global user.email you@example.com
+```
+You can also just copy your git config file inside the container.
+```
+lmh core put $HOME/.gitconfig /root/.gitconfig
+```
+
 To copy over .ssh keys inside the container, please use:
 
 ```
 lmh core cpssh /real/path/to/id_rsa /real/path/to/id_rsa.pub
 ```
-On most configurations this is simply:
+
+If they are in the default location (in $HOME/.ssh), you can also use:
 ```
-lmh core cpssh $HOME/.ssh/id_rsa $HOME/.ssh/id_rsa.pub
+lmh core cpssh
 ```
 
 If this fails, you can also do this manually:
@@ -138,7 +160,10 @@ chmod 600 ~/.ssh/id_rsa.pub
 exit # exists the shell created by lmh core
 ```
 
-Depending on your system configuration the files created inside the docker container might be owned by the root user on the real system causing permission problems.
+Depending on your system configuration the files created inside the docker container might be owned by the root user on the real system causing permission problems. To fix this, you can run at any time:
+```
+lmh core fp
+```
 
 ### The lmh core developer mode
 
