@@ -107,9 +107,9 @@ function command_ensure_running(){
   if [ "$(docker inspect --format='{{ .State.Running }}' $docker_pid 2> /dev/null || echo 'no')" == "no" ]; then
     echo "Creating new container. "
     if [ "$lmh_devmode" == "true" ]; then
-      docker_pid=$(docker create -v "$lmh_devdir:/path/to/localmh" $lmh_repo )
+      docker_pid=$(docker create  -t -v "$lmh_devdir:/path/to/localmh" $lmh_repo )
     else
-      docker_pid=$(docker create -v "$lmh_mountdir:/path/to/localmh/MathHub" $lmh_repo )
+      docker_pid=$(docker create -t -v "$lmh_mountdir:/path/to/localmh/MathHub" $lmh_repo )
     fi
     echo $docker_pid > "$lmh_configfile"
   fi
@@ -210,8 +210,20 @@ function run_wrapper_lmh(){
 
   command_ensure_running
 
-  lmh_line="lmh $@"
+  out_path="$lmh_mountdir"
+  if [ "$lmh_devmode" == "true" ]; then
+    in_path="/path/to/localmh/MathHub"
+  else
+    in_path="/path/to/localmh"
+  fi
+
+  # Replace absolute paths
+  # There might be problems with this, so we need to check this again.
+  lmh_line=$(echo "lmh $@" | sed "s|^$out_path|$in_path|" | sed "s| $out_path| $in_path|")
+  echo $lmh_line
+
   docker exec -t -i $docker_pid /bin/sh -c "cd \$HOME/localmh/$lmh_relpath; $lmh_line"
+
   exit $?
 }
 
