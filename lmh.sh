@@ -131,6 +131,12 @@ function command_ensure_running(){
 
 function command_status(){
   # The status command.
+
+  if [ "$docker_pid" != "" ] && [ "$(docker inspect --format='{{ .State.Running }}' $docker_pid 2> /dev/null || echo 'no')" == "no" ]; then
+    docker_pid=""
+    rm $lmh_config_file
+  fi
+
   if [ "$docker_pid" == "" ]; then
     echo "Container Id:   <none>"
   else
@@ -212,11 +218,20 @@ function run_wrapper_lmh(){
 function command_cpssh(){
 
   # copy over the ssh
-  if [ "${1}" == "" ] || [ "${2}" == "" ]; then
-    echo """Usage: $0 core cpssh ID_RSA ID_RSA_PUB
+
+  if [ "${1}" == "" ] && [ "${2}" == "" ]; then
+    id_rsa_path="$HOME/.ssh/id_rsa"
+    id_rsa_pub_path="$HOME/.ssh/id_rsa.pub"
+  else
+    if [ "${1}" == "" ] || [ "${2}" == "" ]; then
+      echo """Usage: $0 core cpssh [ID_RSA ID_RSA_PUB]
 Copies over the ssh keys from the host system to the container.
+If no parameters are given, uses the standard location.
 """
-    exit 0
+      exit 0
+    fi
+    id_rsa_path="${1}"
+    id_rsa_pub_path="${2}"
   fi
 
   command_ensure_running
@@ -225,8 +240,8 @@ Copies over the ssh keys from the host system to the container.
   docker exec -t $docker_pid /bin/sh -c "mkdir -p \$HOME/.ssh"
 
   # Copy over the id_rsa and id_rsa.pub
-  $0 core put "${1}" /root/.ssh/id_rsa
-  $0 core put "${2}" /root/.ssh/id_rsa.pub
+  $0 core put "$id_rsa_path" /root/.ssh/id_rsa
+  $0 core put "$id_rsa_pub_path" /root/.ssh/id_rsa.pub
 
   # Fix permissions
   docker exec $docker_pid  /bin/sh -c "chmod 600 \$HOME/.ssh/id_rsa"
@@ -253,6 +268,7 @@ function command_fp(){
 function command_destroy(){
   # Destroys the lmh container
   docker rm -f $docker_pid
+  rm $lmh_configfile
   exit $?
 }
 
