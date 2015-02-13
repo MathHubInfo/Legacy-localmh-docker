@@ -220,7 +220,7 @@ function run_wrapper_lmh(){
   # Replace absolute paths
   # There might be problems with this, so we need to check this again.
   lmh_line=$(echo "lmh $@" | sed "s|^$out_path|$in_path|" | sed "s| $out_path| $in_path|")
-  echo $lmh_line
+  #echo $lmh_line
 
   docker exec -t -i $docker_pid /bin/sh -c "cd \$HOME/localmh/$lmh_relpath; $lmh_line"
 
