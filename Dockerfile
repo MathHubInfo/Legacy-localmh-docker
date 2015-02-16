@@ -52,7 +52,10 @@ RUN git clone https://github.com/KWARC/localmh $HOME/localmh; \
     ln -s $HOME/localmh/bin/lmh /usr/local/bin/lmh; \
     lmh setup --no-firstrun --install all
 
+# For sTeX to work, we need this
+RUN echo "max_in_open = 50\nparam_size = 20000\nnest_size = 1000\nstack_size = 10000\n" >> $(kpsewhich texmf.cnf)
+
 #
 # And run the tail command, to do nothing
 #
-CMD tail -f /dev/null
+CMD /bin/bash -c "tail -f /dev/null"
