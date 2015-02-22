@@ -36,7 +36,6 @@ Because docker needs some kernel-specific features, to run docker on MacOSX you 
 Whenever running the wrapper script, please make sure that the boot2docker VM is running.
 
 ### Installing the wrapper script
-  docker exec $docker_pid  /bin/sh -c "chown -R $uid:$gid /path/to/localmh"
 
 First, download and store the wrapper script in a location that is contained in your $PATH. (Note: it is recommended to remove any legacy lmh installation first via ```[sudo] pip uninstall lmh```. )
 ```bash
