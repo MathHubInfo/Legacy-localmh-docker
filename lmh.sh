@@ -107,9 +107,9 @@ function command_ensure_running(){
   if [ "$(docker inspect --format='{{ .State.Running }}' $docker_pid 2> /dev/null || echo 'no')" == "no" ]; then
     echo "Creating new container. "
     if [ "$lmh_devmode" == "true" ]; then
-      docker_pid=$(docker create  -t -v "$lmh_devdir:/path/to/localmh" $lmh_repo )
+      docker_pid=$(docker create -t -e SSH_AUTH_SOCK=/ssh-agent -v $(dirname $SSH_AUTH_SOCK):/ssh-agent -v "$lmh_devdir:/path/to/localmh"  $lmh_repo )
     else
-      docker_pid=$(docker create -t -v "$lmh_mountdir:/path/to/localmh/MathHub" $lmh_repo )
+      docker_pid=$(docker create -t -e SSH_AUTH_SOCK=/ssh-agent -v $(dirname $SSH_AUTH_SOCK):/ssh-agent -v "$lmh_mountdir:/path/to/localmh/MathHub" $lmh_repo )
     fi
     echo $docker_pid > "$lmh_configfile"
   fi
