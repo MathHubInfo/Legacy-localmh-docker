@@ -4,27 +4,33 @@
 # (c) 2015 the KWARC group <kwarc.info>
 #
 
+#=================================
+# CONFIG
+#=================================
 
-#
-# CONFIGURATION
-#
-lmh_repo="kwarc/localmh" # docker repository for lmh
-lmh_configfile="$HOME/.lmh_docker" # file to store state in.
-lmh_mountdir="$(pwd)" # Default directory to mount.
+# Docker repository for lmh.
+lmh_repo="kwarc/localmh"
 
+# Configuration file to store the container in.
+lmh_configfile="$HOME/.lmh_docker"
 
-#
-# END CONFIGURATION
-#
+# Directory to mount if the directory is not directly given.
+lmh_mountdir="$HOME/MathHub"
 
+# Paths to executables
+docker="$(which docker)"
+sed="$(which sed)"
 
-#
-# UTILITY FUNCTIONS
-#
+#=================================
+# HELPERS
+#=================================
 
 function need_executable()
 {
-  # checks if a function exists
+  # Checks if a function exists
+  # @param $0 - path of executable to check.
+  # @param $1 - Name of executable to print.
+
   if [ "${1}" != "" ]; then
     :
   else
@@ -39,12 +45,14 @@ function need_executable()
   fi
 }
 
-#
-# COMMAND FUNCTIONS
-#
+#=================================
+# CORE COMMANDS
+#=================================
 
 function command_help()
 {
+  # Provides help text
+
   echo """LMH Core Script
 
 (c) 2015 The KWARC group <kwarc.info>
@@ -100,6 +108,13 @@ See $0 core --help for more information. """ >&2
   exit 1
 }
 
+function command_ensure_exists(){
+  if [ -z "$docker_pid" ]; then
+    echo "Nothing to do since the conatiner does not exist..."
+    exit 0
+  fi
+}
+
 function command_ensure_running(){
   # make sure everything is set up properly
 
@@ -107,9 +122,9 @@ function command_ensure_running(){
   if [ "$(docker inspect --format='{{ .State.Running }}' $docker_pid 2> /dev/null || echo 'no')" == "no" ]; then
     echo "Creating new container. "
     if [ "$lmh_devmode" == "true" ]; then
-      docker_pid=$(docker create -t -e SSH_AUTH_SOCK=/ssh-agent -v $(dirname $SSH_AUTH_SOCK):/ssh-agent -v "$lmh_devdir:/path/to/localmh"  $lmh_repo )
+      docker_pid=$(docker create -t -v "$lmh_devdir:/path/to/localmh"  $lmh_repo )
     else
-      docker_pid=$(docker create -t -e SSH_AUTH_SOCK=/ssh-agent -v $(dirname $SSH_AUTH_SOCK):/ssh-agent -v "$lmh_mountdir:/path/to/localmh/MathHub" $lmh_repo )
+      docker_pid=$(docker create -t -v "$lmh_mountdir:/path/to/localmh/MathHub" $lmh_repo )
     fi
     echo $docker_pid > "$lmh_configfile"
   fi
@@ -176,6 +191,8 @@ container. Overwrite existing files.
 function command_get(){
   # Get files from inside the container
 
+  command_ensure_exists
+
   if [ "${1}" == "" ] || [ "${2}" == "" ]; then
     echo """Usage: $0 core get CONTAINERFILE HOSTFILE
 Copies a file CONTAINERFILE inside the
@@ -200,6 +217,9 @@ function command_start(){
 }
 
 function command_stop(){
+
+  command_ensure_exists
+
   # Stops the docker container.
   docker stop -t 1 $docker_pid
   exit $?
@@ -259,6 +279,8 @@ If no parameters are given, uses the standard location.
   docker exec $docker_pid  /bin/sh -c "chmod 600 \$HOME/.ssh/id_rsa"
   docker exec $docker_pid  /bin/sh -c "chmod 600 \$HOME/.ssh/id_rsa.pub"
 
+  # And run docker add stuff.
+
   # The end.
   exit $?
 }
@@ -278,6 +300,8 @@ function command_fp(){
 }
 
 function command_destroy(){
+  command_ensure_exists
+
   # Destroys the lmh container
   docker rm -f $docker_pid
   rm $lmh_configfile
@@ -337,25 +361,40 @@ function command_core(){
   exit 1
 }
 
-#
-# MAIN CODE
-#
+#=================================
+# Initalisation code
+#=================================
+
+# check if dependencies exist.
+need_executable "$docker" "Docker"
+need_executable "$sed" "sed"
 
 # Check if we want to mount a different directory.
 if [ -d "$LMH_CONTENT_DIR" ]; then
+  # Remove trailing slashes
+  LMH_CONTENT_DIR=$(echo "$LMH_CONTENT_DIR" | $sed -e 's/\/*$//g')
   lmh_mountdir="$LMH_CONTENT_DIR"
 fi
 
-# For when when we do deving.
+# For dev mode, we want to mount the dev dir.
 if [ -d "$LMH_DEV_DIR" ]; then
+  # Remove trailing slashes
+  LMH_DEV_DIR=$(echo "$LMH_DEV_DIR" | $sed -e 's/\/*$//g')
+
   lmh_devmode="true"
   lmh_devdir="$LMH_DEV_DIR"
   lmh_mountdir="$LMH_DEV_DIR/MathHub"
 fi
 
-# Check if we have the docker excutable
-docker=$(which docker)
-need_executable "$docker" "Docker"
+# If we are not in dev mode
+# and the directory is not given
+# give a warning and die
+if [ "$lmh_devmode" != "true" ]; then
+  if [ ! -d "$lmh_mountdir" ]; then
+    echo "Mount directory $lmh_mountdir does not exist, exiting. "
+    exit 1
+  fi
+fi
 
 # Check if we have a config file, if so read in the id of the docker container.
 if [ -r "$lmh_configfile" ]; then
@@ -365,6 +404,7 @@ else
 fi
 
 # Computing the relative directories.
+# TODO: remove this part of the code by just symlinking inside docker appropriatly
 lmh_pwd="$(pwd)"
 lmh_pwdcut="$(echo "$lmh_pwd" | cut -c 1-$((${#lmh_mountdir})))"
 lmh_relpath=$(pwd | cut -c $((${#lmh_mountdir} + 2))-)
@@ -382,4 +422,5 @@ if [ "$1" == "core" ]; then
   exit $?
 else
   run_wrapper_lmh "$@"
+  exit $?
 fi

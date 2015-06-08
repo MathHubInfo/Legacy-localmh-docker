@@ -19,6 +19,7 @@ RUN echo "Acquire::http {No-Cache=True;};" > /etc/apt/apt.conf.d/no-cache
 RUN apt-get update && \
     apt-get dist-upgrade -y && \
     apt-get install -y python python-dev python-pip git subversion wget tar fontconfig perl cpanminus libxml2-dev libxslt-dev libgdbm-dev openjdk-7-jre-headless && \
+    apt-get install -y vim emacs && \
     apt-get clean
 #
 # Install TexLive vanilla
@@ -30,6 +31,7 @@ ENV HOME /root
 # make directory and add the installation profile
 RUN mkdir -p $HOME/texlive
 ADD install.profile $HOME/texlive/install.profile
+
 # download the installer,
 # run it and then
 # remove the installer again (we do not need it anymore)
@@ -47,15 +49,15 @@ ENV PATH /usr/local/texlive/2014/bin/x86_64-linux:$PATH
 #
 # Install lmh itself
 #
-RUN git clone https://github.com/KWARC/localmh $HOME/localmh; \
+RUN git clone https://github.com/KWARC/localmh /path/to/localmh; \
     pip install beautifulsoup4 psutil pyapi-gitlab; \
-    ln -s $HOME/localmh/bin/lmh /usr/local/bin/lmh; \
+    ln -s /path/to/localmh/bin/lmh /usr/local/bin/lmh; \
     lmh setup --no-firstrun --install all
 
-# For sTeX to work, we need this
+# We need to change a few variables for sTeX to work.
 RUN echo "max_in_open = 50\nparam_size = 20000\nnest_size = 1000\nstack_size = 10000\n" >> $(kpsewhich texmf.cnf)
 
 #
-# And run the tail command, to do nothing
+# AND run nothing. 
 #
 CMD /bin/bash -c "tail -f /dev/null"
