@@ -57,7 +57,10 @@ RUN git clone https://github.com/KWARC/localmh /path/to/localmh; \
 # We need to change a few variables for sTeX to work.
 RUN echo "max_in_open = 50\nparam_size = 20000\nnest_size = 1000\nstack_size = 10000\n" >> $(kpsewhich texmf.cnf)
 
+# Set up some ssh agent magic.
+ADD sshag.sh $HOME/sshag.sh
+
 #
-# AND run nothing. 
+# AND run nothing.
 #
 CMD /bin/bash -c "tail -f /dev/null"

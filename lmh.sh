@@ -17,6 +17,9 @@ lmh_configfile="$HOME/.lmh_docker"
 # Directory to mount if the directory is not directly given.
 lmh_mountdir="$HOME/MathHub"
 
+# Directory to SSH files.
+lmh_sshdir="$HOME/.ssh"
+
 # Paths to executables
 docker="$(which docker)"
 sed="$(which sed)"
@@ -66,7 +69,6 @@ Usage: $0 core [start|status|stop|destroy|put|get|fp|help] [--help] [ARGS]
   destroy Destroys the local lmh container.
   put     Copy files from the host system to the docker container.
   get     Copy files from the docker container to the host system.
-  cpssh   Copy over the ssh keys from the host system.
   fp      Fix permissions of the mounted directries.
   help    Displays this help message.
   --help  Alias for $0 core help
@@ -102,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 function command_unknown(){
   echo """$0 core: Unknown command ${1}
 
-Usage: $0 core [start|cp|status|stop|destroy|put|get|cpssh|fp|help] [--help] [ARGS]
+Usage: $0 core [start|cp|status|stop|destroy|put|get|fp|help] [--help] [ARGS]
 
 See $0 core --help for more information. """ >&2
   exit 1
@@ -110,7 +112,7 @@ See $0 core --help for more information. """ >&2
 
 function command_ensure_exists(){
   if [ -z "$docker_pid" ]; then
-    echo "Nothing to do since the conatiner does not exist..."
+    echo "Nothing to do since the container does not exist..."
     exit 0
   fi
 }
@@ -120,26 +122,33 @@ function command_ensure_running(){
 
   # Create container if it does not exist.
   if [ "$(docker inspect --format='{{ .State.Running }}' $docker_pid 2> /dev/null || echo 'no')" == "no" ]; then
-    echo "Creating new container. "
+    echo "Creating docker container. "
+
+    # Mount directories inside the container.
+    # We have the data directory and the .ssh directory.
+
     if [ "$lmh_devmode" == "true" ]; then
-      docker_pid=$(docker create -t -v "$lmh_devdir:/path/to/localmh"  $lmh_repo )
+      docker_pid=$(docker create -t -v "$lmh_sshdir:/root/.ssh" -v "$lmh_devdir:/path/to/localmh"  $lmh_repo )
     else
-      docker_pid=$(docker create -t -v "$lmh_mountdir:/path/to/localmh/MathHub" $lmh_repo )
+      docker_pid=$(docker create -t -v "$lmh_sshdir:/root/.ssh" -v "$lmh_mountdir:/path/to/localmh/MathHub" $lmh_repo )
     fi
+
+    # Store the pid inside the configfile.
+    # TODO: Firgure out how to name stuff.
     echo $docker_pid > "$lmh_configfile"
   fi
 
   # Start the container if it isn't already.
   if [ "$(docker inspect --format='{{ .State.Running }}' $docker_pid)" == "false" ]; then
-    docker start $docker_pid > /dev/null
+    $docker start $docker_pid > /dev/null
 
+    # Now just link inside the container correctly.
     if [ "$lmh_devmode" == "true" ]; then
-      # Link the MathHub directory if we have to.
-      docker exec -t -i $docker_pid /bin/bash -c 'cd $HOME; if [[ -L localmh ]]; then : ; else echo "Linking localmh directory in development mode. " && mv localmh localmh.org && ln -s /path/to/localmh localmh ; fi '
+      $docker exec -t -i $docker_pid /bin/bash -c 'cd $HOME; if [[ -L '"$lmh_mountdir"' ]]; then : ; else echo "Linking LMH_DEV_DIR ..." && mkdir -p '"$lmh_devdir"' && rmdir '"$lmh_devdir"' && ln -s /path/to/localmh '"$lmh_devdir"'; fi '
     else
-      # Link the MathHub directory if we have to.
-      docker exec -t -i $docker_pid /bin/bash -c 'cd $HOME/localmh; if [[ -L MathHub ]]; then : ; else echo "Linking localmh/MathHub directory mode. " && mv MathHub $HOME/MathHub.org && ln -s /path/to/localmh/MathHub MathHub ; fi '
+      $docker exec -t -i $docker_pid /bin/bash -c 'cd $HOME; if [[ -L '"$lmh_mountdir"' ]]; then : ; else echo "Linking LMH_CONTENT_DIR ..." && mkdir -p '"$lmh_mountdir"' && rmdir '"$lmh_mountdir"' && ln -s /path/to/localmh/MathHub '"$lmh_mountdir"'; fi '
     fi
+
   fi
 
 }
@@ -167,6 +176,8 @@ function command_status(){
   else
     echo "Data directory: $lmh_mountdir"
   fi
+
+  echo "Currently in:   $lmh_pwd"
   exit 0
 }
 
@@ -184,7 +195,7 @@ container. Overwrite existing files.
 
   command_ensure_running
 
-  cat "${1}" | docker exec -i $docker_pid /bin/sh -c "cat > \"${2}\""
+  cat "${1}" | $docker exec -i $docker_pid /bin/sh -c "cat > \"${2}\""
   exit 0
 }
 
@@ -203,7 +214,7 @@ container to the file HOSTFILE on the host system. Overwrites existing files.
 
   command_ensure_running
 
-  docker exec -t -i $docker_pid /bin/sh -c "cat \"${1}\"" > "${2}"
+  $docker exec -t -i $docker_pid /bin/sh -c "cat \"${1}\"" > "${2}"
   exit 0
 }
 
@@ -212,7 +223,7 @@ function command_start(){
 
   command_ensure_running
 
-  docker exec -t -i $docker_pid /bin/sh -c "cd \$HOME/localmh/$lmh_relpath; /bin/bash"
+  $docker exec -t -i $docker_pid /bin/bash -c "cd $lmh_pwd; source \$HOME/sshag.sh; /bin/bash"
   exit $?
 }
 
@@ -221,67 +232,17 @@ function command_stop(){
   command_ensure_exists
 
   # Stops the docker container.
-  docker stop -t 1 $docker_pid
+  $docker stop -t 1 $docker_pid
   exit $?
 }
 
 function run_wrapper_lmh(){
   # Run the lmh inside
 
+  # Check that the command is running.
   command_ensure_running
 
-  out_path="$lmh_mountdir"
-  if [ "$lmh_devmode" == "true" ]; then
-    in_path="/path/to/localmh/MathHub"
-  else
-    in_path="/path/to/localmh"
-  fi
-
-  # Replace absolute paths
-  # There might be problems with this, so we need to check this again.
-  lmh_line=$(echo "lmh $@" | sed "s|^$out_path|$in_path|" | sed "s| $out_path| $in_path|")
-  #echo $lmh_line
-
-  docker exec -t -i $docker_pid /bin/sh -c "cd \$HOME/localmh/$lmh_relpath; $lmh_line"
-
-  exit $?
-}
-
-function command_cpssh(){
-
-  # copy over the ssh
-
-  if [ "${1}" == "" ] && [ "${2}" == "" ]; then
-    id_rsa_path="$HOME/.ssh/id_rsa"
-    id_rsa_pub_path="$HOME/.ssh/id_rsa.pub"
-  else
-    if [ "${1}" == "" ] || [ "${2}" == "" ]; then
-      echo """Usage: $0 core cpssh [ID_RSA ID_RSA_PUB]
-Copies over the ssh keys from the host system to the container.
-If no parameters are given, uses the standard location.
-"""
-      exit 0
-    fi
-    id_rsa_path="${1}"
-    id_rsa_pub_path="${2}"
-  fi
-
-  command_ensure_running
-
-  # Create $HOME/.ssh
-  docker exec -t $docker_pid /bin/sh -c "mkdir -p \$HOME/.ssh"
-
-  # Copy over the id_rsa and id_rsa.pub
-  $0 core put "$id_rsa_path" /root/.ssh/id_rsa
-  $0 core put "$id_rsa_pub_path" /root/.ssh/id_rsa.pub
-
-  # Fix permissions
-  docker exec $docker_pid  /bin/sh -c "chmod 600 \$HOME/.ssh/id_rsa"
-  docker exec $docker_pid  /bin/sh -c "chmod 600 \$HOME/.ssh/id_rsa.pub"
-
-  # And run docker add stuff.
-
-  # The end.
+  $docker exec -t -i $docker_pid /bin/bash -c "source \$HOME/sshag.sh; cd $lmh_pwd; lmh $@"
   exit $?
 }
 
@@ -347,11 +308,6 @@ function command_core(){
     exit 0
   fi
 
-  if [ "${1}" == "cpssh" ]; then
-    command_cpssh "${2}" "${3}"
-    exit 0
-  fi
-
   if [ "${1}" == "fp" ]; then
     command_fp
     exit 0
@@ -403,17 +359,13 @@ else
   docker_pid=""
 fi
 
-# Computing the relative directories.
-# TODO: remove this part of the code by just symlinking inside docker appropriatly
+# Check if we are inside the mounted directory.
 lmh_pwd="$(pwd)"
 lmh_pwdcut="$(echo "$lmh_pwd" | cut -c 1-$((${#lmh_mountdir})))"
-lmh_relpath=$(pwd | cut -c $((${#lmh_mountdir} + 2))-)
 
-# are we inside the mount_dir
+#If not, we just cd into the mounted directory
 if [[ "$lmh_mountdir" != "$lmh_pwdcut" ]]; then
-  lmh_relpath=""
-else
-  lmh_relpath="MathHub/$lmh_relpath"
+  lmh_pwd="$lmh_mountdir"
 fi
 
 #
