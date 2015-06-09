@@ -60,7 +60,7 @@ function command_help()
 
 (c) 2015 The KWARC group <kwarc.info>
 
-Usage: $0 core [start|status|stop|destroy|put|get|fp|help] [--help] [ARGS]
+Usage: $0 core [start|status|stop|destroy|sshinit|put|get|fp|help] [--help] [ARGS]
 
   start   Connects to a container for lmh. Creates a new container if it does
           not already exist.
@@ -73,6 +73,18 @@ Usage: $0 core [start|status|stop|destroy|put|get|fp|help] [--help] [ARGS]
   fp      Fix permissions of the mounted directries.
   help    Displays this help message.
   --help  Alias for $0 core help
+
+Environment Variables:
+  LMH_CONTENT_DIR Directory to mount as MathHub data directory inside the
+                  container.
+  LMH_DEV_DIR     Directory to mount as localmh installation inside the
+                  container. Overwrites the above and should only be needed for
+                  developers.
+
+  Changes to these variables requires the created to be destroyed and re-created
+  via:
+    lmh core destroy
+    lmh core start
 
 When a new container is created the MathHub directory in the lmh instance will
 have to be mounted. By default, this script mounts the current directory. This
@@ -243,7 +255,9 @@ function run_wrapper_lmh(){
   # Check that the command is running.
   command_ensure_running
 
-  $docker exec -t -i $docker_pid /bin/bash -c "source \$HOME/sshag.sh; cd $lmh_pwd; lmh $@"
+  lmhline="lmh $@"
+
+  $docker exec -t -i $docker_pid /bin/bash -c "source \$HOME/sshag.sh; cd $lmh_pwd; $lmhline"
   exit $?
 }
 
