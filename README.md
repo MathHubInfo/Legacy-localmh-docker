@@ -105,6 +105,7 @@ for some status information.
 ```
 # Whenever you create a new container
 lmh core put $HOME/.gitconfig /root/.gitconfig
+lmh core sshinit
 # Whenever permissions are wrong.
 lmh core fp
 ```
@@ -134,6 +135,17 @@ lmh core put $HOME/.gitconfig /root/.gitconfig
 Depending on your system configuration the files created inside the docker container might be owned by the root user on the real system causing permission problems. To fix this, you can run at any time:
 ```
 lmh core fp
+```
+
+Furthermore whenever you update ssh keys, you should run an `ssh-add` inside the container. To do this, run:
+```bash
+lmh core start # Gives you a shell inside docker
+ssh-add # Runs inside the sub shell and adds ssh keys
+exit # Closes the subshell
+```
+Alternatively, you can just run: 
+```bash
+lmh core sshinit
 ```
 
 ### The lmh core developer mode

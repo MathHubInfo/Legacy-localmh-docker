@@ -67,6 +67,7 @@ Usage: $0 core [start|status|stop|destroy|put|get|fp|help] [--help] [ARGS]
   status  Checks the status of the container.
   stop    Stops the container for lmh.
   destroy Destroys the local lmh container.
+  sshinit Updates ssh keys inside the container.
   put     Copy files from the host system to the docker container.
   get     Copy files from the docker container to the host system.
   fp      Fix permissions of the mounted directries.
@@ -104,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 function command_unknown(){
   echo """$0 core: Unknown command ${1}
 
-Usage: $0 core [start|cp|status|stop|destroy|put|get|fp|help] [--help] [ARGS]
+Usage: $0 core [start|cp|status|stop|destroy|sshinit|put|get|fp|help] [--help] [ARGS]
 
 See $0 core --help for more information. """ >&2
   exit 1
@@ -256,7 +257,17 @@ function command_fp(){
   gid="$(id -g)"
 
   # run the command.
-  docker exec $docker_pid  /bin/sh -c "chown -R $uid:$gid /path/to/localmh"
+  $docker exec $docker_pid  /bin/sh -c "chown -R $uid:$gid /path/to/localmh"
+  exit $?
+}
+
+function command_sshinit(){
+  # fix permissions in the mounted directory.
+
+  command_ensure_running
+
+  # run the command.
+  $docker exec $docker_pid  /bin/bash -c "source \$HOME/sshag.sh; ssh-add; echo \"=======\"; ssh-add -l"
   exit $?
 }
 
@@ -264,7 +275,7 @@ function command_destroy(){
   command_ensure_exists
 
   # Destroys the lmh container
-  docker rm -f $docker_pid
+  $docker rm -f $docker_pid
   rm $lmh_configfile
   exit $?
 }
@@ -295,6 +306,11 @@ function command_core(){
 
   if [ "${1}" == "destroy" ]; then
     command_destroy
+    exit 0
+  fi
+
+  if [ "${1}" == "sshinit" ]; then
+    command_sshinit
     exit 0
   fi
 
