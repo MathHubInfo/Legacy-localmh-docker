@@ -74,7 +74,7 @@ Before using the wrapper script, you will need to understand how it works. It cr
 
 ### Regular usage
 
-If the wrapper script is named "lmh" you can use the normal lmh commands seemlessly. The only exception from this is "lmh core" which is handled by the wrapper script only. The commands will be run inside the docker container, however it has proper access to the LMH_DATA_DIR and will automatically run commands in the right directory. If no container exists or it is not running, it will automatically be created.
+If the wrapper script is named "lmh" you can use the normal lmh commands seemlessly. The only exception from this is "lmh core" which is handled by the wrapper script only. The commands will be run inside the docker container, however it has proper access to the LMH_CONTENT_DIR and will automatically run commands in the right directory. If no container exists or it is not running, it will automatically be created.
 
 For more information on the supported core commands, please run
 ```
@@ -105,7 +105,6 @@ for some status information.
 ```
 # Whenever you create a new container
 lmh core put $HOME/.gitconfig /root/.gitconfig
-lmh core cpssh
 # Whenever permissions are wrong.
 lmh core fp
 ```
@@ -130,33 +129,6 @@ git config --global user.email you@example.com
 You can also just copy your git config file inside the container.
 ```
 lmh core put $HOME/.gitconfig /root/.gitconfig
-```
-
-To copy over .ssh keys inside the container, please use:
-
-```
-lmh core cpssh /real/path/to/id_rsa /real/path/to/id_rsa.pub
-```
-
-If they are in the default location (in $HOME/.ssh), you can also use:
-```
-lmh core cpssh
-```
-
-If this fails, you can also do this manually:
-```
-# Make sure you have created $HOME/.ssh inside the container
-lmh core put /real/path/to/id_rsa /root/.ssh/id_rsa
-lmh core put /real/path/to/id_rsa.pub /root/.ssh/id_rsa.pub
-```
-which will copy over ssh keys to the docker container. Then do:
-
-```
-lmh core start # Opens a shell inside the container
-# Sets ssh permissions correctly
-chmod 600 ~/.ssh/id_rsa
-chmod 600 ~/.ssh/id_rsa.pub
-exit # exists the shell created by lmh core
 ```
 
 Depending on your system configuration the files created inside the docker container might be owned by the root user on the real system causing permission problems. To fix this, you can run at any time:

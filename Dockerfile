@@ -63,4 +63,4 @@ ADD sshag.sh $HOME/sshag.sh
 #
 # AND run nothing.
 #
-CMD /bin/bash -c "tail -f /dev/null"
+CMD /bin/bash -c "source ~/sshag.sh; ssh-add; tail -f /dev/null"
