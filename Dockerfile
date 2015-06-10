@@ -5,22 +5,6 @@ FROM debian:stable
 
 MAINTAINER Tom Wiesing <tkw01536@gmail.com>
 
-# make apt-get faster, from https://gist.github.com/jpetazzo/6127116
-# this forces dpkg not to call sync() after package extraction and speeds up install
-RUN echo "force-unsafe-io" > /etc/dpkg/dpkg.cfg.d/02apt-speedup
-# we don't need and apt cache in a container
-RUN echo "Acquire::http {No-Cache=True;};" > /etc/apt/apt.conf.d/no-cache
-
-#
-# Install all the packages
-# This might take a while
-#
-
-RUN apt-get update && \
-    apt-get dist-upgrade -y && \
-    apt-get install -y python python-dev python-pip git subversion wget tar fontconfig perl cpanminus libxml2-dev libxslt-dev libgdbm-dev openjdk-7-jre-headless && \
-    apt-get install -y vim emacs && \
-    apt-get clean
 #
 # Install TexLive vanilla
 #
@@ -28,9 +12,25 @@ RUN apt-get update && \
 #make sure HOME points to root even if this changes later on.
 ENV HOME /root
 
+# make apt-get faster, from https://gist.github.com/jpetazzo/6127116
+# this forces dpkg not to call sync() after package extraction and speeds up install
+RUN echo "force-unsafe-io" > /etc/dpkg/dpkg.cfg.d/02apt-speedup
+# we don't need and apt cache in a container
+RUN echo "Acquire::http {No-Cache=True;};" > /etc/apt/apt.conf.d/no-cache
+
+#
+# Install needed packages
+# This might take a while
+#
+
+RUN apt-get update && \
+    apt-get dist-upgrade -y && \
+    apt-get install -y wget perl && \
+    apt-get clean
+
 # make directory and add the installation profile
 RUN mkdir -p $HOME/texlive
-ADD install.profile $HOME/texlive/install.profile
+ADD files/install.profile $HOME/texlive/install.profile
 
 # download the installer,
 # run it and then
@@ -47,6 +47,14 @@ ENV INFOPATH /usr/local/texlive/2014/texmf-dist/doc/man:$MANPATH
 ENV PATH /usr/local/texlive/2014/bin/x86_64-linux:$PATH
 
 #
+# Install all the packages
+# This might take a while
+#
+
+RUN apt-get install -y python python-dev python-pip git subversion tar fontconfig cpanminus libxml2-dev libxslt-dev libssl-dev libgdbm-dev openjdk-7-jre-headless && \
+    apt-get clean
+
+#
 # Install lmh itself
 #
 RUN git clone https://github.com/KWARC/localmh /path/to/localmh; \
@@ -54,11 +62,20 @@ RUN git clone https://github.com/KWARC/localmh /path/to/localmh; \
     ln -s /path/to/localmh/bin/lmh /usr/local/bin/lmh; \
     lmh setup --no-firstrun --install all
 
+# Install fonts
+# see KWARC/localmh#217
+RUN mkdir -p /usr/share/fonts/opentype/Fandol && \
+    mkdir -p /usr/share/fonts/truetype/cwTeX
+ADD files/FandolFang-Regular.otf /usr/share/fonts/opentype/Fandol/
+ADD files/cwTeXQKai-Medium.ttf /usr/share/fonts/truetype/cwTeX/
+
+RUN fc-cache
+
 # We need to change a few variables for sTeX to work.
 RUN echo "max_in_open = 50\nparam_size = 20000\nnest_size = 1000\nstack_size = 10000\n" >> $(kpsewhich texmf.cnf)
 
 # Set up some ssh agent magic.
-ADD sshag.sh $HOME/sshag.sh
+ADD files/sshag.sh $HOME/sshag.sh
 
 #
 # AND run nothing.

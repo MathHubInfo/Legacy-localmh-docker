@@ -56,7 +56,7 @@ function command_help()
 {
   # Provides help text
 
-  echo """LMH Core Script
+  echo """LMH Docker Wrapper Core Script
 
 (c) 2015 The KWARC group <kwarc.info>
 
@@ -96,8 +96,21 @@ Example:
     If no container exists, creates a new one with the directory
     \$HOME/localmh/MathHub used as a directory for data files. If a container
     already exists, attaches to it.
+=======
+Environment Variables:
+  LMH_CONTENT_DIR Directory to mount as MathHub data directory inside the
+                  container.
+  LMH_DEV_DIR     Directory to mount as localmh installation inside the
+                  container. Overwrites the above and should only be needed for
+                  developers.
+
+  Changes to these variables requires the created to be destroyed and re-created
+  via:
+    lmh core destroy
+    lmh core start
 
 Licensing information:
+
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
