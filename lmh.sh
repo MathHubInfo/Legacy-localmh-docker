@@ -294,7 +294,7 @@ function command_sshinit(){
   command_ensure_running
 
   # run the command.
-  $docker exec $docker_pid  /bin/bash -c "source \$HOME/sshag.sh; ssh-add; echo \"=======\"; ssh-add -l"
+  $docker exec -t -i $docker_pid  /bin/bash -c "source \$HOME/sshag.sh; ssh-add; echo \"=======\"; ssh-add -l"
   exit $?
 }
 
