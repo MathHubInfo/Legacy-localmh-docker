@@ -1,11 +1,14 @@
+# texlive.profile written on Mon Jun 15 07:40:53 2015 UTC
+# It will NOT be updated and reflects only the
+# installation profile at installation time.
 selected_scheme scheme-full
-TEXDIR /usr/local/texlive/2014
-TEXMFCONFIG ~/.texlive2014/texmf-config
+TEXDIR /usr/local/texlive/2015
+TEXMFCONFIG ~/.texlive2015/texmf-config
 TEXMFHOME ~/texmf
 TEXMFLOCAL /usr/local/texlive/texmf-local
-TEXMFSYSCONFIG /usr/local/texlive/2014/texmf-config
-TEXMFSYSVAR /usr/local/texlive/2014/texmf-var
-TEXMFVAR ~/.texlive2014/texmf-var
+TEXMFSYSCONFIG /usr/local/texlive/2015/texmf-config
+TEXMFSYSVAR /usr/local/texlive/2015/texmf-var
+TEXMFVAR ~/.texlive2015/texmf-var
 binary_x86_64-linux 1
 collection-basic 1
 collection-bibtexextra 1

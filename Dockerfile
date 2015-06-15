@@ -42,9 +42,9 @@ RUN wget -nv -O $HOME/texlive/texlive.tar.gz http://mirror.ctan.org/systems/texl
     rm -rf $HOME/texlive
 
 # Add the TEXLIVE PATHs
-ENV INFOPATH /usr/local/texlive/2014/texmf-dist/doc/info:$INFOPATH
-ENV INFOPATH /usr/local/texlive/2014/texmf-dist/doc/man:$MANPATH
-ENV PATH /usr/local/texlive/2014/bin/x86_64-linux:$PATH
+ENV INFOPATH /usr/local/texlive/2015/texmf-dist/doc/info:$INFOPATH
+ENV INFOPATH /usr/local/texlive/2015/texmf-dist/doc/man:$MANPATH
+ENV PATH /usr/local/texlive/2015/bin/x86_64-linux:$PATH
 
 #
 # Install all the packages
