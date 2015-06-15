@@ -105,7 +105,7 @@ for some status information.
 ```
 # Whenever you create a new container
 lmh core put $HOME/.gitconfig /root/.gitconfig
-lmh core sshinit
+lmh core cinit
 # Whenever permissions are wrong.
 lmh core fp
 ```
@@ -143,9 +143,9 @@ lmh core start # Gives you a shell inside docker
 ssh-add # Runs inside the sub shell and adds ssh keys
 exit # Closes the subshell
 ```
-Alternatively, you can just run: 
+Additionally, whenever you create a new container you should update the git config inside the container. All this is done automatically with the command:
 ```bash
-lmh core sshinit
+lmh core cinit
 ```
 
 ### The lmh core developer mode

@@ -19,14 +19,65 @@ lmh_mountdir="$HOME/MathHub"
 
 # Directory to SSH files.
 lmh_sshdir="$HOME/.ssh"
+# Arguments for docker
+
 
 # Paths to executables
 docker="$(which docker)"
 sed="$(which sed)"
 
+if [ -t 1 ]
+then
+  docker_intargs="-i -t"
+else
+  docker_intargs="-i -t"
+fi
+
 #=================================
 # HELPERS
 #=================================
+
+function init_vars()
+{
+  # Initialise directory variables.
+
+  # Check if we want to mount a different directory.
+  if [ -d "$LMH_CONTENT_DIR" ]; then
+    # Remove trailing slashes
+    LMH_CONTENT_DIR=$(echo "$LMH_CONTENT_DIR" | $sed -e 's/\/*$//g')
+    lmh_mountdir="$LMH_CONTENT_DIR"
+  fi
+
+  # For dev mode, we want to mount the dev dir.
+  if [ -d "$LMH_DEV_DIR" ]; then
+    # Remove trailing slashes
+    LMH_DEV_DIR=$(echo "$LMH_DEV_DIR" | $sed -e 's/\/*$//g')
+
+    lmh_devmode="true"
+    lmh_devdir="$LMH_DEV_DIR"
+    lmh_mountdir="$LMH_DEV_DIR/MathHub"
+  fi
+
+  # If we are not in dev mode
+  # and the directory is not given
+  # give a warning and die
+  if [ "$lmh_devmode" != "true" ]; then
+    if [ ! -d "$lmh_mountdir" ]; then
+      echo "Mount directory $lmh_mountdir does not exist, exiting. "
+      exit 1
+    fi
+  fi
+
+  # Check if we are inside the mounted directory.
+  lmh_pwd="$(pwd)"
+  lmh_pwdcut="$(echo "$lmh_pwd" | cut -c 1-$((${#lmh_mountdir})))"
+
+  #If not, we just cd into the mounted directory
+  if [[ "$lmh_mountdir" != "$lmh_pwdcut" ]]; then
+    lmh_pwd="$lmh_mountdir"
+  fi
+
+}
 
 function need_executable()
 {
@@ -60,14 +111,14 @@ function command_help()
 
 (c) 2015 The KWARC group <kwarc.info>
 
-Usage: $0 core [start|status|stop|destroy|sshinit|put|get|fp|help] [--help] [ARGS]
+Usage: $0 core [start|status|stop|destroy|cinit|put|get|fp|help] [--help] [ARGS]
 
   start   Connects to a container for lmh. Creates a new container if it does
           not already exist.
   status  Checks the status of the container.
   stop    Stops the container for lmh.
   destroy Destroys the local lmh container.
-  sshinit Updates ssh keys inside the container.
+  cinit   Updates ssh keys and git configuration inside the container.
   put     Copy files from the host system to the docker container.
   get     Copy files from the docker container to the host system.
   fp      Fix permissions of the mounted directries.
@@ -130,7 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 function command_unknown(){
   echo """$0 core: Unknown command ${1}
 
-Usage: $0 core [start|cp|status|stop|destroy|sshinit|put|get|fp|help] [--help] [ARGS]
+Usage: $0 core [start|cp|status|stop|destroy|cinit|put|get|fp|help] [--help] [ARGS]
 
 See $0 core --help for more information. """ >&2
   exit 1
@@ -154,9 +205,9 @@ function command_ensure_running(){
     # We have the data directory and the .ssh directory.
 
     if [ "$lmh_devmode" == "true" ]; then
-      docker_pid=$(docker create -t -v "$lmh_sshdir:/root/.ssh" -v "$lmh_devdir:/path/to/localmh"  $lmh_repo )
+      docker_pid=$(docker create -v "$lmh_sshdir:/root/.ssh" -v "$lmh_devdir:/path/to/localmh"  $lmh_repo )
     else
-      docker_pid=$(docker create -t -v "$lmh_sshdir:/root/.ssh" -v "$lmh_mountdir:/path/to/localmh/MathHub" $lmh_repo )
+      docker_pid=$(docker create -v "$lmh_sshdir:/root/.ssh" -v "$lmh_mountdir:/path/to/localmh/MathHub" $lmh_repo )
     fi
 
     # Store the pid inside the configfile.
@@ -170,9 +221,9 @@ function command_ensure_running(){
 
     # Now just link inside the container correctly.
     if [ "$lmh_devmode" == "true" ]; then
-      $docker exec -t -i $docker_pid /bin/bash -c 'cd $HOME; if [[ -L '"$lmh_mountdir"' ]]; then : ; else echo "Linking LMH_DEV_DIR ..." && mkdir -p '"$lmh_devdir"' && rmdir '"$lmh_devdir"' && ln -s /path/to/localmh '"$lmh_devdir"'; fi '
+      $docker exec $docker_intargs $docker_pid /bin/bash -c 'cd $HOME; if [[ -L '"$lmh_devdir"' ]]; then : ; else echo "Linking LMH_DEV_DIR ..." && mkdir -p '"$lmh_devdir"' && rmdir '"$lmh_devdir"' && ln -s /path/to/localmh '"$lmh_devdir"'; fi '
     else
-      $docker exec -t -i $docker_pid /bin/bash -c 'cd $HOME; if [[ -L '"$lmh_mountdir"' ]]; then : ; else echo "Linking LMH_CONTENT_DIR ..." && mkdir -p '"$lmh_mountdir"' && rmdir '"$lmh_mountdir"' && ln -s /path/to/localmh/MathHub '"$lmh_mountdir"'; fi '
+      $docker exec $docker_intargs $docker_pid /bin/bash -c 'cd $HOME; if [[ -L '"$lmh_mountdir"' ]]; then : ; else echo "Linking LMH_CONTENT_DIR ..." && mkdir -p '"$lmh_mountdir"' && rmdir '"$lmh_mountdir"' && ln -s /path/to/localmh/MathHub '"$lmh_mountdir"'; fi '
     fi
 
   fi
@@ -240,7 +291,7 @@ container to the file HOSTFILE on the host system. Overwrites existing files.
 
   command_ensure_running
 
-  $docker exec -t -i $docker_pid /bin/sh -c "cat \"${1}\"" > "${2}"
+  $docker exec $docker_intargs $docker_pid /bin/sh -c "cat \"${1}\"" > "${2}"
   exit 0
 }
 
@@ -249,7 +300,7 @@ function command_start(){
 
   command_ensure_running
 
-  $docker exec -t -i $docker_pid /bin/bash -c "cd $lmh_pwd; source \$HOME/sshag.sh; /bin/bash"
+  $docker exec $docker_intargs $docker_pid /bin/bash -c "cd $lmh_pwd; source \$HOME/sshag.sh; /bin/bash"
   exit $?
 }
 
@@ -270,7 +321,7 @@ function run_wrapper_lmh(){
 
   lmhline="lmh $@"
 
-  $docker exec -t -i $docker_pid /bin/bash -c "source \$HOME/sshag.sh; cd $lmh_pwd; $lmhline"
+  $docker exec $docker_intargs $docker_pid /bin/bash -c "source \$HOME/sshag.sh; cd $lmh_pwd; $lmhline"
   exit $?
 }
 
@@ -288,13 +339,33 @@ function command_fp(){
   exit $?
 }
 
-function command_sshinit(){
-  # fix permissions in the mounted directory.
+function command_cinit(){
+  # Initialise the container
 
   command_ensure_running
 
-  # run the command.
-  $docker exec -t -i $docker_pid  /bin/bash -c "source \$HOME/sshag.sh; ssh-add; echo \"=======\"; ssh-add -l"
+  # Add ssh keys
+  echo "Adding SSH Keys..."
+  $docker exec $docker_intargs $docker_pid  /bin/bash -c "source \$HOME/sshag.sh; ssh-add; echo \"=======\"; ssh-add -l"
+
+
+  # Read 'real' git config and update
+  echo "Auto-updating git config ..."
+  git=$(which git)
+  need_executable "$git" "git"
+
+  gitcfgs=( "user.name" "user.email")
+
+  for i in "${gitcfgs[@]}"
+  do
+    echo "    $i"
+
+    git_cfg="$(git config --get $i)"
+
+    $docker exec $docker_intargs $docker_pid  /bin/bash -c "git config --system $i \"$git_cfg\""
+  done
+
+  echo "Done. "
   exit $?
 }
 
@@ -316,42 +387,50 @@ function command_core(){
   fi
 
   if [ "${1}" == "status" ]; then
+    init_vars
     command_status
     exit 0
   fi
 
 
   if [ "${1}" == "start" ]; then
+    init_vars
     command_start
     exit 0
   fi
 
   if [ "${1}" == "stop" ]; then
+    init_vars
     command_stop
     exit 0
   fi
 
   if [ "${1}" == "destroy" ]; then
+    init_vars
     command_destroy
     exit 0
   fi
 
-  if [ "${1}" == "sshinit" ]; then
-    command_sshinit
+  if [ "${1}" == "cinit" ]; then
+    init_vars
+    command_cinit
     exit 0
   fi
 
   if [ "${1}" == "put" ]; then
+    init_vars
     command_put "${2}" "${3}"
     exit 0
   fi
 
   if [ "${1}" == "get" ]; then
+    init_vars
     command_get "${2}" "${3}"
     exit 0
   fi
 
   if [ "${1}" == "fp" ]; then
+    init_vars
     command_fp
     exit 0
   fi
@@ -368,33 +447,6 @@ function command_core(){
 need_executable "$docker" "Docker"
 need_executable "$sed" "sed"
 
-# Check if we want to mount a different directory.
-if [ -d "$LMH_CONTENT_DIR" ]; then
-  # Remove trailing slashes
-  LMH_CONTENT_DIR=$(echo "$LMH_CONTENT_DIR" | $sed -e 's/\/*$//g')
-  lmh_mountdir="$LMH_CONTENT_DIR"
-fi
-
-# For dev mode, we want to mount the dev dir.
-if [ -d "$LMH_DEV_DIR" ]; then
-  # Remove trailing slashes
-  LMH_DEV_DIR=$(echo "$LMH_DEV_DIR" | $sed -e 's/\/*$//g')
-
-  lmh_devmode="true"
-  lmh_devdir="$LMH_DEV_DIR"
-  lmh_mountdir="$LMH_DEV_DIR/MathHub"
-fi
-
-# If we are not in dev mode
-# and the directory is not given
-# give a warning and die
-if [ "$lmh_devmode" != "true" ]; then
-  if [ ! -d "$lmh_mountdir" ]; then
-    echo "Mount directory $lmh_mountdir does not exist, exiting. "
-    exit 1
-  fi
-fi
-
 # Check if we have a config file, if so read in the id of the docker container.
 if [ -r "$lmh_configfile" ]; then
   docker_pid=$(cat $lmh_configfile)
@@ -402,20 +454,12 @@ else
   docker_pid=""
 fi
 
-# Check if we are inside the mounted directory.
-lmh_pwd="$(pwd)"
-lmh_pwdcut="$(echo "$lmh_pwd" | cut -c 1-$((${#lmh_mountdir})))"
-
-#If not, we just cd into the mounted directory
-if [[ "$lmh_mountdir" != "$lmh_pwdcut" ]]; then
-  lmh_pwd="$lmh_mountdir"
-fi
-
 #
 if [ "$1" == "core" ]; then
   command_core "$2" "$3" "$4"
   exit $?
 else
+  init_vars
   run_wrapper_lmh "$@"
   exit $?
 fi
