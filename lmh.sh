@@ -99,6 +99,21 @@ function need_executable()
   fi
 }
 
+function os_open()
+{
+  if [ "$(which open)" != "" ]; then
+    open "${1}"
+    exit $?
+  else
+    if [ "$(which xdg-open)" != "" ]; then
+      xdg-open "${1}"
+      exit $?
+    else
+      exit 1
+    fi
+  fi
+}
+
 #=================================
 # CORE COMMANDS
 #=================================
@@ -321,7 +336,45 @@ function run_wrapper_lmh(){
 
   lmhline="lmh $@"
 
+  # Wrap lmh issue to open in a webbrowser
+  if [ "$1" == "issue" ] || [ "$1" == "cissue" ]; then
+    lmh_res=$($docker exec $docker_intargs $docker_pid /bin/bash -c "source \$HOME/sshag.sh; cd $lmh_pwd; $lmhline")
+    lmh_code="$?"
+
+    if [ "$lmh_code" == "0" ]; then
+      os_open "$(echo -n $lmh_res | tr -d '\r')"
+      exit 0
+    else
+      echo $lmh_res
+      exit $lmh_code
+    fi
+  fi
+
+  # Wrap more stuff
+  if [ "$1" == "cissue" ]; then
+    if [ "$lmh_devmode" == "true" ]; then
+      echo $lmh_mountdir
+      exit 0
+    else
+      echo "lmh root: not mounted"
+      exit 1
+    fi
+  fi
+
+  # Wrap lmh root to display the real path
+  # if needed
+  if [ "$1" == "root" ]; then
+    if [ "$lmh_devmode" == "true" ]; then
+      echo $lmh_mountdir
+      exit 0
+    else
+      echo "lmh root: not mounted"
+      exit 1
+    fi
+  fi
+
   $docker exec $docker_intargs $docker_pid /bin/bash -c "source \$HOME/sshag.sh; cd $lmh_pwd; $lmhline"
+
   exit $?
 }
 
