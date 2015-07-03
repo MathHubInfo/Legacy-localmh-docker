@@ -487,6 +487,7 @@ function command_core(){
 
 # check if dependencies exist.
 need_executable "$docker" "Docker"
+docker="$docker --tlsverify=false" # possible fix for KWARC/localmh#229
 need_executable "$sed" "sed"
 
 # Check if we have a config file, if so read in the id of the docker container.
