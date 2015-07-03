@@ -60,7 +60,7 @@ RUN apt-get install -y python python-dev python-pip git subversion tar fontconfi
 RUN git clone https://github.com/KWARC/localmh /path/to/localmh; \
     pip install beautifulsoup4 psutil pyapi-gitlab; \
     ln -s /path/to/localmh/bin/lmh /usr/local/bin/lmh; \
-    lmh setup --no-firstrun --install all
+    lmh setup --install all
 
 # Install fonts
 # see KWARC/localmh#217
