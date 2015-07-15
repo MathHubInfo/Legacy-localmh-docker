@@ -77,6 +77,9 @@ function init_vars()
     lmh_pwd="$lmh_mountdir"
   fi
 
+  # code for lmh initisalisation inside docker.
+  lmh_init="source \$HOME/sshag.sh; export TERM=xterm"
+
 }
 
 function need_executable()
@@ -213,16 +216,16 @@ function command_ensure_running(){
   # make sure everything is set up properly
 
   # Create container if it does not exist.
-  if [ "$(docker inspect --format='{{ .State.Running }}' $docker_pid 2> /dev/null || echo 'no')" == "no" ]; then
+  if [ "$($docker inspect --format='{{ .State.Running }}' $docker_pid 2> /dev/null || echo 'no')" == "no" ]; then
     echo "Creating docker container. "
 
     # Mount directories inside the container.
     # We have the data directory and the .ssh directory.
 
     if [ "$lmh_devmode" == "true" ]; then
-      docker_pid=$(docker create -v "$lmh_sshdir:/root/.ssh" -v "$lmh_devdir:/path/to/localmh"  $lmh_repo )
+      docker_pid=$($docker create -v "$lmh_sshdir:/root/.ssh" -v "$lmh_devdir:/path/to/localmh"  $lmh_repo )
     else
-      docker_pid=$(docker create -v "$lmh_sshdir:/root/.ssh" -v "$lmh_mountdir:/path/to/localmh/MathHub" $lmh_repo )
+      docker_pid=$($docker create -v "$lmh_sshdir:/root/.ssh" -v "$lmh_mountdir:/path/to/localmh/MathHub" $lmh_repo )
     fi
 
     # Store the pid inside the configfile.
@@ -231,7 +234,7 @@ function command_ensure_running(){
   fi
 
   # Start the container if it isn't already.
-  if [ "$(docker inspect --format='{{ .State.Running }}' $docker_pid)" == "false" ]; then
+  if [ "$($docker inspect --format='{{ .State.Running }}' $docker_pid)" == "false" ]; then
     $docker start $docker_pid > /dev/null
 
     # Now just link inside the container correctly.
@@ -248,7 +251,7 @@ function command_ensure_running(){
 function command_status(){
   # The status command.
 
-  if [ "$docker_pid" != "" ] && [ "$(docker inspect --format='{{ .State.Running }}' $docker_pid 2> /dev/null || echo 'no')" == "no" ]; then
+  if [ "$docker_pid" != "" ] && [ "$($docker inspect --format='{{ .State.Running }}' $docker_pid 2> /dev/null || echo 'no')" == "no" ]; then
     docker_pid=""
     rm $lmh_config_file
   fi
@@ -257,7 +260,7 @@ function command_status(){
     echo "Container Id:   <none>"
   else
     echo "Container Id:   $docker_pid"
-    if [ "$(docker inspect --format='{{ .State.Running }}' $docker_pid)" == "false" ]; then
+    if [ "$($docker inspect --format='{{ .State.Running }}' $docker_pid)" == "false" ]; then
       echo "Status:         Not running"
     else
       echo "Status:         Running"
@@ -315,7 +318,7 @@ function command_start(){
 
   command_ensure_running
 
-  $docker exec $docker_intargs $docker_pid /bin/bash -c "cd $lmh_pwd; source \$HOME/sshag.sh; /bin/bash"
+  $docker exec $docker_intargs $docker_pid /bin/bash -c "$lmh_init; cd $lmh_pwd; /bin/bash"
   exit $?
 }
 
@@ -338,7 +341,7 @@ function run_wrapper_lmh(){
 
   # Wrap lmh issue to open in a webbrowser
   if [ "$1" == "issue" ] || [ "$1" == "cissue" ]; then
-    lmh_res=$($docker exec $docker_intargs $docker_pid /bin/bash -c "source \$HOME/sshag.sh; cd $lmh_pwd; $lmhline")
+    lmh_res=$($docker exec $docker_intargs $docker_pid /bin/bash -c "$lmh_init; cd $lmh_pwd; $lmhline")
     lmh_code="$?"
 
     if [ "$lmh_code" == "0" ]; then
@@ -373,7 +376,7 @@ function run_wrapper_lmh(){
     fi
   fi
 
-  $docker exec $docker_intargs $docker_pid /bin/bash -c "source \$HOME/sshag.sh; cd $lmh_pwd; $lmhline"
+  $docker exec $docker_intargs $docker_pid /bin/bash -c "$lmh_init; cd $lmh_pwd; $lmhline"
 
   exit $?
 }
@@ -399,7 +402,7 @@ function command_cinit(){
 
   # Add ssh keys
   echo "Adding SSH Keys..."
-  $docker exec $docker_intargs $docker_pid  /bin/bash -c "source \$HOME/sshag.sh; ssh-add; echo \"=======\"; ssh-add -l"
+  $docker exec $docker_intargs $docker_pid  /bin/bash -c "$lmh_init; ssh-add; echo \"=======\"; ssh-add -l"
 
 
   # Read 'real' git config and update
@@ -498,6 +501,7 @@ function command_core(){
 
 # check if dependencies exist.
 need_executable "$docker" "Docker"
+docker="$docker --tlsverify=false"
 need_executable "$sed" "sed"
 
 # Check if we have a config file, if so read in the id of the docker container.
