@@ -19,19 +19,22 @@ lmh_mountdir="$HOME/MathHub"
 
 # Directory to SSH files.
 lmh_sshdir="$HOME/.ssh"
-# Arguments for docker
-
 
 # Paths to executables
-docker="$(which docker)"
-sed="$(which sed)"
+docker="$(which docker 2> /dev/null)"
+sed="$(which sed 2> /dev/null)"
 
+# Arguments for docker
+# Set up interactivity parameters.
 if [ -t 1 ]
 then
   docker_intargs="-i -t"
 else
   docker_intargs="-i -t"
 fi
+
+# Script version
+lmh_wrapper_version="0.2"
 
 #=================================
 # HELPERS
@@ -104,11 +107,11 @@ function need_executable()
 
 function os_open()
 {
-  if [ "$(which open)" != "" ]; then
+  if [ "$(which open 2> /dev/null)" != "" ]; then
     open "${1}"
     exit $?
   else
-    if [ "$(which xdg-open)" != "" ]; then
+    if [ "$(which xdg-open 2> /dev/null)" != "" ]; then
       xdg-open "${1}"
       exit $?
     else
@@ -125,7 +128,7 @@ function command_help()
 {
   # Provides help text
 
-  echo """LMH Docker Wrapper Core Script
+  echo """lmh_docker wrapper script, version $lmh_wrapper_version
 
 (c) 2015 The KWARC group <kwarc.info>
 
@@ -165,18 +168,6 @@ Example:
     If no container exists, creates a new one with the directory
     \$HOME/localmh/MathHub used as a directory for data files. If a container
     already exists, attaches to it.
-=======
-Environment Variables:
-  LMH_CONTENT_DIR Directory to mount as MathHub data directory inside the
-                  container.
-  LMH_DEV_DIR     Directory to mount as localmh installation inside the
-                  container. Overwrites the above and should only be needed for
-                  developers.
-
-  Changes to these variables requires the created to be destroyed and re-created
-  via:
-    lmh core destroy
-    lmh core start
 
 Licensing information:
 
@@ -221,7 +212,6 @@ function command_ensure_running(){
 
     # Mount directories inside the container.
     # We have the data directory and the .ssh directory.
-
     if [ "$lmh_devmode" == "true" ]; then
       docker_pid=$($docker create -v "$lmh_sshdir:/root/.ssh" -v "$lmh_devdir:/path/to/localmh"  $lmh_repo )
     else
@@ -229,7 +219,6 @@ function command_ensure_running(){
     fi
 
     # Store the pid inside the configfile.
-    # TODO: Firgure out how to name stuff.
     echo $docker_pid > "$lmh_configfile"
   fi
 
@@ -239,11 +228,10 @@ function command_ensure_running(){
 
     # Now just link inside the container correctly.
     if [ "$lmh_devmode" == "true" ]; then
-      $docker exec $docker_intargs $docker_pid /bin/bash -c 'cd $HOME; if [[ -L '"$lmh_devdir"' ]]; then : ; else echo "Linking LMH_DEV_DIR ..." && mkdir -p '"$lmh_devdir"' && rmdir '"$lmh_devdir"' && ln -s /path/to/localmh '"$lmh_devdir"'; fi '
+      $docker exec $docker_intargs $docker_pid /bin/bash -c 'cd $HOME; if [[ -L '"$lmh_devdir"' ]]; then : ; else mkdir -p '"$lmh_devdir"' && rmdir '"$lmh_devdir"' && ln -s /path/to/localmh '"$lmh_devdir"'; fi '
     else
-      $docker exec $docker_intargs $docker_pid /bin/bash -c 'cd $HOME; if [[ -L '"$lmh_mountdir"' ]]; then : ; else echo "Linking LMH_CONTENT_DIR ..." && mkdir -p '"$lmh_mountdir"' && rmdir '"$lmh_mountdir"' && ln -s /path/to/localmh/MathHub '"$lmh_mountdir"'; fi '
+      $docker exec $docker_intargs $docker_pid /bin/bash -c 'cd $HOME; if [[ -L '"$lmh_mountdir"' ]]; then : ; else mkdir -p '"$lmh_mountdir"' && rmdir '"$lmh_mountdir"' && ln -s /path/to/localmh/MathHub '"$lmh_mountdir"'; fi '
     fi
-
   fi
 
 }
@@ -400,6 +388,8 @@ function command_cinit(){
 
   command_ensure_running
 
+
+
   # Add ssh keys
   echo "Adding SSH Keys..."
   $docker exec $docker_intargs $docker_pid  /bin/bash -c "$lmh_init; ssh-add; echo \"=======\"; ssh-add -l"
@@ -407,7 +397,7 @@ function command_cinit(){
 
   # Read 'real' git config and update
   echo "Auto-updating git config ..."
-  git=$(which git)
+  git=$(which git 2> /dev/null)
   need_executable "$git" "git"
 
   gitcfgs=( "user.name" "user.email")
@@ -501,7 +491,7 @@ function command_core(){
 
 # check if dependencies exist.
 need_executable "$docker" "Docker"
-docker="$docker --tlsverify=false"
+docker="$docker --tlsverify=false" # workaround for KWARC/localmh#229
 need_executable "$sed" "sed"
 
 # Check if we have a config file, if so read in the id of the docker container.
