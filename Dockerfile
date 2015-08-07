@@ -51,7 +51,7 @@ ENV PATH /usr/local/texlive/2015/bin/x86_64-linux:$PATH
 # This might take a while
 #
 
-RUN apt-get install -y python python-dev python-pip git subversion tar fontconfig cpanminus libxml2-dev libxslt-dev libssl-dev libgdbm-dev liblwp-protocol-https-perl openjdk-7-jre-headless && \
+RUN apt-get install -y python python-dev python-pip git tar fontconfig cpanminus libxml2-dev libxslt-dev libssl-dev libgdbm-dev liblwp-protocol-https-perl openjdk-7-jre-headless && \
     apt-get clean
 
 #
