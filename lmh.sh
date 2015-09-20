@@ -1,511 +1,622 @@
 #!/bin/bash
 
+# make sure we are running bash
+if ! [ -n "$BASH_VERSION" ]; then
+    echo "You need to use bash for this. ";
+    exit 1;
+fi
+
 #
 # (c) 2015 the KWARC group <kwarc.info>
 #
 
-#=================================
-# CONFIG
-#=================================
+# Self
+lmh_wrap_version="1.0.0"
 
-# Docker repository for lmh.
-lmh_repo="kwarc/localmh"
+# Core
+lmh_docker_repo="kwarc/localmh:dev" # Docker repository for lmh.
+lmh_container_name="localmh_docker" # Name of lmh docker container
+lmh_machine_name="hostname" # Hostname of the machine
+lmh_user_name="user" # Name of the user
+lmh_group_name="group" # Name of the group for the user
+lmh_host_name="hostname" # Host name of the docker machine.
 
-# Configuration file to store the container in.
-lmh_configfile="$HOME/.lmh_docker"
+# find the path of lmh
+pushd `dirname $(realpath $0)` > /dev/null
+lmh_script_path=`pwd`
+popd > /dev/null
 
-# Directory to mount if the directory is not directly given.
-lmh_mountdir="$HOME/MathHub"
 
-# Directory to SSH files.
-lmh_sshdir="$HOME/.ssh"
-
-# Paths to executables
-docker="$(which docker 2> /dev/null)"
-sed="$(which sed 2> /dev/null)"
-
-# Arguments for docker
-# Set up interactivity parameters.
-if [ -t 1 ]
-then
-  docker_intargs="-i -t"
-else
-  docker_intargs="-i -t"
-fi
-
-# Script version
-lmh_wrapper_version="0.2"
-
-#=================================
-# HELPERS
-#=================================
-
-function init_vars()
+# Intialise a variable including a default.
+function init_var()
 {
-  # Initialise directory variables.
-
-  # Check if we want to mount a different directory.
-  if [ -d "$LMH_CONTENT_DIR" ]; then
-    # Remove trailing slashes
-    LMH_CONTENT_DIR=$(echo "$LMH_CONTENT_DIR" | $sed -e 's/\/*$//g')
-    lmh_mountdir="$LMH_CONTENT_DIR"
+  if [ -z "${!1}" ];
+  then   echo $2;
+  else   echo "${!1}";
   fi
-
-  # For dev mode, we want to mount the dev dir.
-  if [ -d "$LMH_DEV_DIR" ]; then
-    # Remove trailing slashes
-    LMH_DEV_DIR=$(echo "$LMH_DEV_DIR" | $sed -e 's/\/*$//g')
-
-    lmh_devmode="true"
-    lmh_devdir="$LMH_DEV_DIR"
-    lmh_mountdir="$LMH_DEV_DIR/MathHub"
-  fi
-
-  # If we are not in dev mode
-  # and the directory is not given
-  # give a warning and die
-  if [ "$lmh_devmode" != "true" ]; then
-    if [ ! -d "$lmh_mountdir" ]; then
-      echo "Mount directory $lmh_mountdir does not exist, exiting. "
-      exit 1
-    fi
-  fi
-
-  # Check if we are inside the mounted directory.
-  lmh_pwd="$(pwd)"
-  lmh_pwdcut="$(echo "$lmh_pwd" | cut -c 1-$((${#lmh_mountdir})))"
-
-  #If not, we just cd into the mounted directory
-  if [[ "$lmh_mountdir" != "$lmh_pwdcut" ]]; then
-    lmh_pwd="$lmh_mountdir"
-  fi
-
-  # code for lmh initisalisation inside docker.
-  lmh_init="source \$HOME/sshag.sh; export TERM=xterm"
-
 }
 
-function need_executable()
+function cleanup_directory()
 {
-  # Checks if a function exists
-  # @param $0 - path of executable to check.
-  # @param $1 - Name of executable to print.
-
-  if [ "${1}" != "" ]; then
-    :
-  else
-    echo "${2} not found. "
-    exit 1
-  fi
-  if [ -x ${1} ]; then
-    :
-  else
-    echo "${2} not found. "
-    exit 1
-  fi
+  echo "$1" | $sed -e 's/\/*$//g'
 }
 
-function os_open()
+# Code to autostart docker-machine VM
+# Unused on Linux.
+function docker_machine_support
 {
-  if [ "$(which open 2> /dev/null)" != "" ]; then
-    open "${1}"
-    exit $?
-  else
-    if [ "$(which xdg-open 2> /dev/null)" != "" ]; then
-      xdg-open "${1}"
-      exit $?
-    else
-      exit 1
+  # Run docker machine code if we support it.
+  if [ -z "$LMH_DOCKER_MACHINE" ]; then : ; else
+
+    docker_machine_status="$($docker_machine status $LMH_DOCKER_MACHINE 2> /dev/null)"
+
+    # If docker machine is not started, we want to start it.
+    if [ "$docker_machine_status" == "Stopped" ] && [ "$1" != "off" ]; then
+      $docker_machine start $LMH_DOCKER_MACHINE > /dev/null
     fi
-  fi
+
+    # get the environment variables (if applicable)
+    if [ "$1" != "off" ]; then
+      eval "$($docker_machine env $LMH_DOCKER_MACHINE 2> /dev/null)";
+    fi
+
+  fi;
 }
 
-#=================================
-# CORE COMMANDS
-#=================================
 
-function command_help()
+function docker_container_running
 {
-  # Provides help text
-
-  echo """lmh_docker wrapper script, version $lmh_wrapper_version
-
-(c) 2015 The KWARC group <kwarc.info>
-
-Usage: $0 core [start|status|stop|destroy|cinit|put|get|fp|help] [--help] [ARGS]
-
-  start   Connects to a container for lmh. Creates a new container if it does
-          not already exist.
-  status  Checks the status of the container.
-  stop    Stops the container for lmh.
-  destroy Destroys the local lmh container.
-  cinit   Updates ssh keys and git configuration inside the container.
-  put     Copy files from the host system to the docker container.
-  get     Copy files from the docker container to the host system.
-  fp      Fix permissions of the mounted directries.
-  help    Displays this help message.
-  --help  Alias for $0 core help
-
-Environment Variables:
-  LMH_CONTENT_DIR Directory to mount as MathHub data directory inside the
-                  container.
-  LMH_DEV_DIR     Directory to mount as localmh installation inside the
-                  container. Overwrites the above and should only be needed for
-                  developers.
-
-  Changes to these variables requires the created to be destroyed and re-created
-  via:
-    lmh core destroy
-    lmh core start
-
-When a new container is created the MathHub directory in the lmh instance will
-have to be mounted. By default, this script mounts the current directory. This
-behaviour can be overriden by setting the LMH_CONTENT_DIR environment variable
-to an existing directory.
-
-Example:
-  LMH_CONTENT_DIR="\$HOME/localmh/MathHub" $0 start
-    If no container exists, creates a new one with the directory
-    \$HOME/localmh/MathHub used as a directory for data files. If a container
-    already exists, attaches to it.
-
-Licensing information:
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
-"""
-  exit 0
+  [ "$($docker inspect --format="{{ .State.Running }}" $lmh_container_name 2> /dev/null)" == "true" ]
+  return $?
 }
 
-function command_unknown(){
-  echo """$0 core: Unknown command ${1}
-
-Usage: $0 core [start|cp|status|stop|destroy|cinit|put|get|fp|help] [--help] [ARGS]
-
-See $0 core --help for more information. """ >&2
-  exit 1
-}
-
-function command_ensure_exists(){
-  if [ -z "$docker_pid" ]; then
-    echo "Nothing to do since the container does not exist..."
-    exit 0
-  fi
-}
-
-function command_ensure_running(){
-  # make sure everything is set up properly
-
-  # Create container if it does not exist.
-  if [ "$($docker inspect --format='{{ .State.Running }}' $docker_pid 2> /dev/null || echo 'no')" == "no" ]; then
-    echo "Creating docker container. "
-
-    # Mount directories inside the container.
-    # We have the data directory and the .ssh directory.
-    if [ "$lmh_devmode" == "true" ]; then
-      docker_pid=$($docker create -v "$lmh_sshdir:/root/.ssh" -v "$lmh_devdir:/path/to/localmh"  $lmh_repo )
-    else
-      docker_pid=$($docker create -v "$lmh_sshdir:/root/.ssh" -v "$lmh_mountdir:/path/to/localmh/MathHub" $lmh_repo )
-    fi
-
-    # Store the pid inside the configfile.
-    echo $docker_pid > "$lmh_configfile"
-  fi
-
-  # Start the container if it isn't already.
-  if [ "$($docker inspect --format='{{ .State.Running }}' $docker_pid)" == "false" ]; then
-    $docker start $docker_pid > /dev/null
-
-    # Now just link inside the container correctly.
-    if [ "$lmh_devmode" == "true" ]; then
-      $docker exec $docker_intargs $docker_pid /bin/bash -c 'cd $HOME; if [[ -L '"$lmh_devdir"' ]]; then : ; else mkdir -p '"$lmh_devdir"' && rmdir '"$lmh_devdir"' && ln -s /path/to/localmh '"$lmh_devdir"'; fi '
-    else
-      $docker exec $docker_intargs $docker_pid /bin/bash -c 'cd $HOME; if [[ -L '"$lmh_mountdir"' ]]; then : ; else mkdir -p '"$lmh_mountdir"' && rmdir '"$lmh_mountdir"' && ln -s /path/to/localmh/MathHub '"$lmh_mountdir"'; fi '
-    fi
-  fi
-
-}
-
-function command_status(){
-  # The status command.
-
-  if [ "$docker_pid" != "" ] && [ "$($docker inspect --format='{{ .State.Running }}' $docker_pid 2> /dev/null || echo 'no')" == "no" ]; then
-    docker_pid=""
-    rm $lmh_config_file
-  fi
-
-  if [ "$docker_pid" == "" ]; then
-    echo "Container Id:   <none>"
+function docker_container_exists
+{
+  if $docker inspect --format="{{ .State.Running }}" $lmh_container_name &> /dev/null; then
+    return 0;
   else
-    echo "Container Id:   $docker_pid"
-    if [ "$($docker inspect --format='{{ .State.Running }}' $docker_pid)" == "false" ]; then
-      echo "Status:         Not running"
-    else
-      echo "Status:         Running"
-    fi
-  fi
-  if [ "$lmh_devmode" == "true" ]; then
-    echo "Dev directory: $lmh_devdir"
+    return 1;
+  fi;
+}
+
+function docker_ensure_running
+{
+
+  # Start the docker machine if available.
+  docker_machine_support
+
+  if docker_container_running; then
+    return 0;
+  fi;
+
+  if docker_container_exists; then
+    >&2 echo "Docker container does not exist, please create one using lmh docker init. "
+    exit 1;
+  fi;
+
+  >&2 echo "Docker container is not running, please start it using lmh docker start. "
+  exit 1;
+
+}
+
+function lmh_docker_status
+{
+  # Make sure docker_machine is running
+  docker_machine_support "off"
+
+  # Is the container running?
+  if docker_container_running; then
+    lmh_docker_status="true";
   else
-    echo "Data directory: $lmh_mountdir"
-  fi
+    lmh_docker_status="false";
+  fi;
 
-  echo "Currently in:   $lmh_pwd"
-  exit 0
+  # Does the container exist?
+  if docker_container_exists; then
+    lmh_docker_existence="true"
+  else
+    lmh_docker_existence="false"
+  fi;
+
+
+  echo "ENVIRONMENT:"
+  echo ""
+  echo "LMH_DATA_DIR        = " "$LMH_DATA_DIR"
+  echo "LMH_ROOT_DIR        = " "$LMH_ROOT_DIR"
+  echo "LMH_DOCKER_MACHINE  = " "$LMH_DOCKER_MACHINE"
+  echo "LMH_SSH_DIR         = " "$LMH_SSH_DIR"
+  echo ""
+  echo ""
+  echo "DOCKER CONTAINER:"
+  echo ""
+  echo "Name:             " $lmh_container_name
+  echo "Container exists: " $lmh_docker_existence
+  echo "Container active: " $lmh_docker_status
+  echo ""
+
 }
 
-function command_put(){
-  # Put files inside
 
-  if [ "${1}" == "" ] || [ "${2}" == "" ]; then
-    echo """Usage: $0 core put HOSTFILE CONTAINERFILE
-Copies a file # Install lmh itself
-HOSTFILE from the host system to the file CONTAINERFILE inside the
-container. Overwrite existing files.
-"""
-    exit 0
-  fi
+#
+# LMH_DOCKER_CREATE
+#
+function lmh_docker_create
+{
+  # Make sure we have a docker machine.
+  docker_machine_support
 
-  command_ensure_running
+  # if the docker container already exists, exit.
+  if docker_container_exists; then
+    >&2 echo "Docker container exists already. Can not create another one. "
+    exit 1;
+  fi;
 
-  cat "${1}" | $docker exec -i $docker_pid /bin/sh -c "cat > \"${2}\""
-  exit 0
-}
-
-function command_get(){
-  # Get files from inside the container
-
-  command_ensure_exists
-
-  if [ "${1}" == "" ] || [ "${2}" == "" ]; then
-    echo """Usage: $0 core get CONTAINERFILE HOSTFILE
-Copies a file CONTAINERFILE inside the
-container to the file HOSTFILE on the host system. Overwrites existing files.
-"""
-    exit 0
-  fi
-
-  command_ensure_running
-
-  $docker exec $docker_intargs $docker_pid /bin/sh -c "cat \"${1}\"" > "${2}"
-  exit 0
-}
-
-function command_start(){
-  # Starts the lmh container.
-
-  command_ensure_running
-
-  $docker exec $docker_intargs $docker_pid /bin/bash -c "$lmh_init; cd $lmh_pwd; /bin/bash"
-  exit $?
-}
-
-function command_stop(){
-
-  command_ensure_exists
-
-  # Stops the docker container.
-  $docker stop -t 1 $docker_pid
-  exit $?
-}
-
-function run_wrapper_lmh(){
-  # Run the lmh inside
-
-  # Check that the command is running.
-  command_ensure_running
-
-  lmhline="lmh $@"
-
-  # Wrap lmh issue to open in a webbrowser
-  if [ "$1" == "issue" ] || [ "$1" == "cissue" ]; then
-    lmh_res=$($docker exec $docker_intargs $docker_pid /bin/bash -c "$lmh_init; cd $lmh_pwd; $lmhline")
-    lmh_code="$?"
-
-    if [ "$lmh_code" == "0" ]; then
-      os_open "$(echo -n $lmh_res | tr -d '\r')"
-      exit 0
-    else
-      echo $lmh_res
-      exit $lmh_code
-    fi
-  fi
-
-  # Wrap more stuff
-  if [ "$1" == "cissue" ]; then
-    if [ "$lmh_devmode" == "true" ]; then
-      echo $lmh_mountdir
-      exit 0
-    else
-      echo "lmh root: not mounted"
-      exit 1
-    fi
-  fi
-
-  # Wrap lmh root to display the real path
-  # if needed
-  if [ "$1" == "root" ]; then
-    if [ "$lmh_devmode" == "true" ]; then
-      echo $lmh_mountdir
-      exit 0
-    else
-      echo "lmh root: not mounted"
-      exit 1
-    fi
-  fi
-
-  $docker exec $docker_intargs $docker_pid /bin/bash -c "$lmh_init; cd $lmh_pwd; $lmhline"
-
-  exit $?
-}
-
-function command_fp(){
-  # fix permissions in the mounted directory.
-
-  command_ensure_running
-
-  # get id and uid
-  uid="$(id -u)"
-  gid="$(id -g)"
-
-  # run the command.
-  $docker exec $docker_pid  /bin/sh -c "chown -R $uid:$gid /path/to/localmh"
-  exit $?
-}
-
-function command_cinit(){
-  # Initialise the container
-
-  command_ensure_running
+  printf "Creating and starting docker container ... "
 
 
 
-  # Add ssh keys
-  echo "Adding SSH Keys..."
-  $docker exec $docker_intargs $docker_pid  /bin/bash -c "$lmh_init; ssh-add; echo \"=======\"; ssh-add -l"
+  # Step 1: Create a docker container and run nothing in it.
 
+  if [ "$lmh_mode" == "content" ]; then
+    docker_localmh_mount="$LMH_DATA_DIR:/mounted/lmh/MathHub"
+  else
+    docker_localmh_mount="$LMH_ROOT_DIR:/mounted/lmh"
+  fi;
 
-  # Read 'real' git config and update
-  echo "Auto-updating git config ..."
-  git=$(which git 2> /dev/null)
-  need_executable "$git" "git"
+  $docker run --privileged=true -d --name $lmh_container_name -h $lmh_host_name -v "$docker_localmh_mount" -v "$LMH_SSH_DIR:/mounted/ssh" $lmh_docker_repo
+
+  # If we did not create it, then exit.
+  if [ $? -ne 0 ]; then
+    echo "Failed. "
+    >&2 echo "Unable to create docker container ... "
+    exit $?;
+  fi;
+
+  echo "Done. "
+
+  printf "Creating user and group inside docker container ... "
+
+  # Step 2: Create an appropriate user.
+  $docker exec $lmh_container_name /bin/bash -c "chown $user_id:$group_id /path/to/home; groupadd -g $group_id $lmh_group_name 2> /dev/null; groupmod -n $lmh_group_name \$(getent group 20 | cut -d: -f1) ; useradd -d /path/to/home -p $lmh_user_name -u $user_id -g $group_id user; " &> /dev/null
+
+  # If we did not create it, then exit.
+  if [ $? -ne 0 ]; then
+    echo "Failed. "
+    >&2 echo "Warning: Unable to create user and group. ";
+  else
+    echo "Done. "
+  fi;
+
+  # Step 3: Set up git.
+  printf "Configuring git settings ..."
 
   gitcfgs=( "user.name" "user.email")
 
   for i in "${gitcfgs[@]}"
   do
-    echo "    $i"
-
     git_cfg="$(git config --get $i)"
 
-    $docker exec $docker_intargs $docker_pid  /bin/bash -c "git config --system $i \"$git_cfg\""
+    $docker exec -u $uid:$gid  $lmh_container_name /bin/bash -c "cd \$HOME && git config --system $i \"$git_cfg\""
   done
 
   echo "Done. "
+
+  # and stop the container again.
+  lmh_docker_stop
+}
+
+function lmh_docker_start
+{
+  # Make sure docker_machine is running.
+  docker_machine_support
+
+  # If it does not exist there is nothing to stop.
+  if docker_container_exists; then
+    :
+  else
+    >&2 echo "Docker container does not exist, there is nothing to start. "
+    exit 1;
+  fi;
+
+  # Container is running, can not stop.
+  if docker_container_running; then
+    >&2 echo "Docker container is already running, can not start it. "
+    exit 1;
+  else
+
+    printf "Starting docker container..."
+
+    $docker start $lmh_container_name &> /dev/null
+
+    if [ $? -ne 0 ]; then
+      echo "Failed. "
+      exit 1;
+    fi;
+
+    bindfs_commandline="-u $lmh_user_name -g $lmh_group_name"
+
+
+    echo "Done. "
+    echo "Remounting directories with correct permissions, please wait ..."
+    $docker exec $lmh_container_name /bin/bash -c "umount /path/to/home/.ssh; bindfs --perms=u+r $bindfs_commandline /mounted/ssh /path/to/home/.ssh" &> /dev/null
+
+    if [ "$lmh_mode" == "content" ]; then
+      $docker exec $lmh_container_name /bin/bash -c "umount /path/to/localmh/MathHub; bindfs -o nonempty --perms=a+rw $bindfs_commandline /mounted/lmh/MathHub /path/to/localmh/MathHub"  &> /dev/null;
+    else
+      $docker exec $lmh_container_name /bin/bash -c "umount /path/to/localmh; bindfs -o nonempty --perms=a+rw $bindfs_commandline /mounted/lmh /path/to/localmh"  &> /dev/null;
+    fi;
+
+    echo "Done. "
+    printf "Updating ssh keys, you might have to enter your password. "
+
+    # Run the ssh magic.
+    $docker exec -u $user_id:$group_id -t -i $lmh_container_name /bin/bash -c "export HOME=/path/to/home; source /path/to/home/sshag.sh; ssh-add; echo \"=======\"; ssh-add -l; "
+
+    # and we are done.
+    echo "Done. "
+
+    exit 0;
+  fi;
+}
+
+function lmh_docker_stop
+{
+  # Make sure docker_machine is running.
+  docker_machine_support
+
+  # If it does not exist there is nothing to stop.
+  if docker_container_exists; then
+    :
+  else
+    >&2 echo "Docker container does not exist, there is nothing to stop. "
+    exit 1;
+  fi;
+
+  # Container is running, can not stop.
+  if docker_container_running; then
+    printf "Unmounting directories ... "
+    $docker exec -t -i  $lmh_container_name /bin/bash -c 'umount /path/to/localmh; umount /path/to/localmh/MathHub; umount /path/to/home/.ssh; ' &> /dev/null
+
+    echo "Done. "
+
+    printf "Stopping docker container ... "
+    $docker stop $lmh_container_name &> /dev/null
+
+    if [ $? -ne 0 ]; then
+      echo "Failed. "
+    else
+      echo "Done. "
+    fi;
+
+    exit $?;
+  else
+    >&2 echo "Docker container is not running, so it can not be stopped. "
+    exit 1;
+  fi;
+}
+
+function lmh_docker_delete
+{
+  # Make sure docker_machine is running.
+  docker_machine_support
+
+  # If it does not exist there is nothing to delete.
+  if docker_container_exists; then
+    :
+  else
+    >&2 echo "Docker container does not exist, there is nothing to delete. "
+    exit 1;
+  fi;
+
+  # Container is running, can not delete.
+  if docker_container_running; then
+    >&2 echo "Docker container is running. Can not delete a running container. "
+    exit 1;
+  fi;
+
+  $docker rm $lmh_container_name
   exit $?
 }
 
-function command_destroy(){
-  command_ensure_exists
 
-  # Destroys the lmh container
-  $docker rm -f $docker_pid
-  rm $lmh_configfile
+#
+# LMH_DOCKER_PULL
+#
+function lmh_docker_pull
+{
+  # Make sure docker_machine is running
+  docker_machine_support
+
+  # Pull the image
+  $docker pull $lmh_docker_repo .
+
+  # exit with whatever code that gave.
   exit $?
 }
 
-function command_core(){
-  # Runs if we are in the core.
+#
+# LMH_DOCKER_PULL
+#
+function lmh_docker_build
+{
+  # Make sure docker_machine is running
+  docker_machine_support
 
-  if [ "${1}" == "help" ] || [ "${1}" == "--help" ]; then
-    command_help
-    exit 0
-  fi
+  # cd into the lmh script path.
+  cd $lmh_script_path
 
-  if [ "${1}" == "status" ]; then
-    init_vars
-    command_status
-    exit 0
-  fi
+  # build the image.
+  $docker build -t $lmh_docker_repo .
+
+  # exit with whatever code that gave.
+  exit $?
+}
+
+#
+# LMH_DOCKER_SHELL
+#
+function lmh_docker_shell
+{
+  # Make sure docker_machine is running
+  docker_machine_support
+
+  if docker_container_exists; then
+    :
+  else
+    >&2 echo "Docker container does not exist, can not start a shell. "
+    exit 1;
+  fi;
+
+  if docker_container_running; then
+    :
+  else
+    >&2 echo "Docker container is not running, can not start a shell. "
+    exit 1;
+  fi;
+
+  $docker exec -u $user_id:$group_id -t -i $lmh_container_name /bin/bash -c "export HOME=/path/to/home; export TERM=xterm; source /path/to/home/sshag.sh; /bin/bash"
+}
+
+#
+# LMH_DOCKER_SSHELL
+#
+function lmh_docker_sshell
+{
+  # Make sure docker_machine is running
+  docker_machine_support
+
+  if docker_container_exists; then
+    :
+  else
+    >&2 echo "Docker container does not exist, can not start a shell. "
+    exit 1;
+  fi;
+
+  if docker_container_running; then
+    :
+  else
+    >&2 echo "Docker container is not running, can not start a shell. "
+    exit 1;
+  fi;
+
+  $docker exec -t -i $lmh_container_name /bin/bash -c "export TERM=xterm; /bin/bash"
+}
+
+#
+# LMH_DOCKER_HELP
+#
+
+docker_usage="Usage: $0 docker [help|--help] [create|start|stop|status|delete|pull|build] [ARGS]"
+function lmh_docker_help()
+{
+  echo """lmh_docker wrapper script, version $lmh_wrap_version
+
+(c) 2015 The KWARC group <kwarc.info>
+
+$docker_usage
+
+  Managing the $lmh_container_name docker container:
+
+  create  Creates a new $lmh_container_name container.
+  start   Starts the existing $lmh_container_name container.
+  stop    Stops the existing $lmh_container_name container.
+  status  Checks the status of the $lmh_container_name container.
+  delete  Deletes the existing $lmh_container_name container.
+
+  Accessing the $lmh_container_name:
+
+  shell   Creates a (limited user) shell inside the $lmh_container_name container.
+  sshell  Creates a root shell inside the $lmh_container_name container.
+
+  Managing the $lmh_docker_repo docker image:
+
+  pull    Pulls a new $lmh_docker_repo image from dockerhub.
+  build   Builds the $lmh_docker_repo image locally.
+
+  help    Displays this help message.
+  --help  Alias for $0 core help
 
 
-  if [ "${1}" == "start" ]; then
-    init_vars
-    command_start
-    exit 0
-  fi
+Environment Variables:
+  LMH_DATA_DIR
+          A data directory to be mounted inside the docker container.
+  LMH_ROOT_DIR
+          localmh installation to be mounted inside the docker container. If
+          this variable is set it overrides LMH_DATA_DIR.
+  LMH_DOCKER_MACHINE
+          Name of the docker-machine VM to be used, if applicable.
+          localmh_docker will autostart this docker machine if needed.
+  LMH_SSH_DIR
+          Path to SSH directory of keys to use inside lmh. Defaults to
+          \$HOME/.ssh
 
-  if [ "${1}" == "stop" ]; then
-    init_vars
-    command_stop
-    exit 0
-  fi
 
-  if [ "${1}" == "destroy" ]; then
-    init_vars
-    command_destroy
-    exit 0
-  fi
+License:
+  localmh_docker is licensed under GPL 3. The full license text can be found in
+  $lmh_script_path/gpl-3.0.txt.
+"""
+  exit 0
+}
 
-  if [ "${1}" == "cinit" ]; then
-    init_vars
-    command_cinit
-    exit 0
-  fi
 
-  if [ "${1}" == "put" ]; then
-    init_vars
-    command_put "${2}" "${3}"
-    exit 0
-  fi
 
-  if [ "${1}" == "get" ]; then
-    init_vars
-    command_get "${2}" "${3}"
-    exit 0
-  fi
+#
+# MAIN COMMANDS
+#
+function lmh_docker()
+{
+  # lmh docker create
+  if [ "$2" == "create" ]; then
+    lmh_docker_create
+    return
+  fi;
 
-  if [ "${1}" == "fp" ]; then
-    init_vars
-    command_fp
-    exit 0
-  fi
+  # lmh docker start
+  if [ "$2" == "start" ]; then
+    lmh_docker_start
+    return
+  fi;
 
-  command_unknown "${1}"
+  # lmh docker stop
+  if [ "$2" == "stop" ]; then
+    lmh_docker_stop
+    return
+  fi;
+
+  # lmh docker delete
+  if [ "$2" == "delete" ]; then
+    lmh_docker_delete
+    return
+  fi;
+
+  # lmh docker status
+  if [ "$2" == "status" ]; then
+    lmh_docker_status
+    return
+  fi;
+
+  # lmh docker pull
+  if [ "$2" == "pull" ]; then
+    lmh_docker_pull
+    return
+  fi;
+
+  # lmh docker build
+  if [ "$2" == "build" ]; then
+    lmh_docker_build
+    return
+  fi;
+
+  # lmh docker shell
+  if [ "$2" == "shell" ]; then
+    lmh_docker_shell
+    return
+  fi;
+
+  # lmh docker sshell
+  if [ "$2" == "sshell" ]; then
+    lmh_docker_sshell
+    return
+  fi;
+
+  # lmh docker [help|--help]
+  if [ "$2" == "help" ] || [ "$2" == "--help" ]; then
+    lmh_docker_help
+    return
+  fi;
+
+  # everything else
+  >&2 echo "Unknown command '$2'"
+  >&2 echo $docker_usage
   exit 1
 }
 
-#=================================
-# Initalisation code
-#=================================
+function lmh_()
+{
+    echo "OTHER"
+    echo "$@"
+}
 
-# check if dependencies exist.
-need_executable "$docker" "Docker"
-need_executable "$sed" "sed"
+# Paths to executables
+docker="$(which docker 2> /dev/null)"
+docker_machine="$(which docker-machine 2> /dev/null)"
+sed="$(which sed 2> /dev/null)"
 
-# Check if we have a config file, if so read in the id of the docker container.
-if [ -r "$lmh_configfile" ]; then
-  docker_pid=$(cat $lmh_configfile)
+# Defaults which can be changed by the user.
+LMH_DATA_DIR="$(init_var "LMH_DATA_DIR" "$HOME/MathHub")"
+LMH_ROOT_DIR="$(init_var "LMH_ROOT_DIR" "")"
+LMH_DOCKER_MACHINE="$(init_var "LMH_DOCKER_MACHINE" "")"
+LMH_SSH_DIR="$(init_var "LMH_SSH_DIR" "$HOME/.ssh")"
+
+# check if LMH_DATA_DIRECTORY exists.
+if [ -z "$LMH_DATA_DIR" ]; then
+  :
 else
-  docker_pid=""
+  if [ -d "$LMH_DATA_DIR" ]; then
+    LMH_DATA_DIR=$(cleanup_directory "$LMH_DATA_DIR")
+    lmh_mode="content";
+  else
+    if [ -z "$LMH_ROOT_DIR" ]; then
+      >&2 echo "LMH_DATA_DIR variable set non-existent directory $LMH_DATA_DIR"
+      exit 1
+    fi;
+  fi;
+fi;
+
+# check for devecdlopment directory
+if [ -z "$LMH_ROOT_DIR" ]; then
+  :
+else
+  if [ -d "$LMH_ROOT_DIR" ]; then
+    LMH_ROOT_DIR=$(cleanup_directory "$LMH_ROOT_DIR")
+    lmh_mode="dev";
+  else
+    >&2 echo "LMH_ROOT_DIR variable set non-existent directory $LMH_ROOT_DIR"
+    exit 1
+  fi;
+fi;
+
+# check for development directory
+if [ -z "$LMH_SSH_DIR" ]; then
+  :
+else
+  if [ -d "$LMH_SSH_DIR" ]; then
+    LMH_SSH_DIR=$(cleanup_directory "$LMH_SSH_DIR")
+  else
+    >&2 echo "LMH_SSH_DIR variable set non-existent directory $LMH_SSH_DIR"
+    exit 1
+  fi;
+fi;
+
+# If we have no mode, exit
+if [ -z "$lmh_mode" ]; then
+  >&2 echo "Neither LMH_DATA_DIR nor LMH_ROOT_DIR are set, exiting. "
+  exit 1
 fi
 
-#
-if [ "$1" == "core" ]; then
-  command_core "$2" "$3" "$4"
-  exit $?
+# Set current relative directory paths.
+
+# for content mode, we go relative to the LMH_DATA_DIR
+if [ "$lmh_mode" == "content" ]; then
+  lmh_pwd="$(pwd)"
+  lmh_pwdcut="$(echo "$lmh_pwd" | cut -c 1-$((${#LMH_DATA_DIR})))"
+  if [[ "$LMH_DATA_DIR" != "$lmh_pwdcut" ]]; then
+    lmh_pwd="$LMH_DATA_DIR"
+  fi;
+# else we go relative to the root directory of lmh.
 else
-  init_vars
-  run_wrapper_lmh "$@"
-  exit $?
-fi
+  lmh_pwd="$(pwd)"
+  lmh_pwdcut="$(echo "$lmh_pwd" | cut -c 1-$((${#LMH_ROOT_DIR})))"
+  if [[ "$LMH_ROOT_DIR" != "$lmh_pwdcut" ]]; then
+    lmh_pwd="$LMH_ROOT_DIR"
+  fi;
+fi;
+
+# Grab user and group id.
+user_id="$(id -u)"
+group_id="$(id -g)"
+
+if [ "$1" == "core" ] || [ "$1" == "docker" ];
+  then lmh_docker "$@";
+  else lmh_ "$@";
+fi;

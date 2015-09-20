@@ -1,0 +1,17 @@
+#!/usr/bin/python3
+import sys, os, os.path, time, signal
+
+# Handle SIGTERM by exiting.
+print("localmh_init started, doing nothing for a while. ")
+signal.signal(signal.SIGTERM, lambda x,y:sys.exit(0))
+
+# Create /tmp if it does not exist.
+if not os.path.exists("/tmp"):
+    os.makedirs("/tmp")
+
+# Give the right permissions
+os.chmod("/tmp", 0o777)
+
+# And just do nothing.
+while True:
+	time.sleep(1000)

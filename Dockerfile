@@ -5,79 +5,104 @@ FROM debian:stable
 
 MAINTAINER Tom Wiesing <tkw01536@gmail.com>
 
-#
-# Install TexLive vanilla
-#
-
-#make sure HOME points to root even if this changes later on.
+ENV term dumb
 ENV HOME /root
 
-# make apt-get faster, from https://gist.github.com/jpetazzo/6127116
-# this forces dpkg not to call sync() after package extraction and speeds up install
-RUN echo "force-unsafe-io" > /etc/dpkg/dpkg.cfg.d/02apt-speedup
-# we don't need and apt cache in a container
-RUN echo "Acquire::http {No-Cache=True;};" > /etc/apt/apt.conf.d/no-cache
-
 #
-# Install needed packages
-# This might take a while
+# STEP 1: INSTALL APT-GET PACKAGES
 #
+RUN echo "Installing apt-get packages" && \
 
-RUN apt-get update && \
+    # Pull package lists and upgrade existing packages.
+    apt-get update && \
     apt-get dist-upgrade -y && \
-    apt-get install -y wget perl && \
-    apt-get clean
 
-# make directory and add the installation profile
-RUN mkdir -p $HOME/texlive
+    # Install all the required dependencies
+    apt-get install -y wget perl python3 python3-dev python3-pip git tar fontconfig cpanminus libxml2-dev libxslt-dev libssl-dev libgdbm-dev liblwp-protocol-https-perl openjdk-7-jre-headless && \
+
+    # Clear apt-get caches to save space
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+
+#
+# STEP 2: Install TexLive + Fonts
+#
+
 ADD files/install.profile $HOME/texlive/install.profile
 
-# download the installer,
-# run it and then
-# remove the installer again (we do not need it anymore)
-RUN wget -nv -O $HOME/texlive/texlive.tar.gz http://mirror.ctan.org/systems/texlive/tlnet/install-tl-unx.tar.gz; \
-    tar -xzf $HOME/texlive/texlive.tar.gz -C $HOME/texlive --strip-components=1; \
-    rm $HOME/texlive/texlive.tar.gz; \
-    cd $HOME/texlive && ./install-tl --persistent-downloads --profile install.profile; \
-    rm -rf $HOME/texlive
+RUN echo "Installing TexLive 2015" && \
 
-# Add the TEXLIVE PATHs
+    # Create the texlive directory
+    mkdir -p $HOME/texlive/ && \
+
+    # Grab the setup image
+    wget -nv -O $HOME/texlive/texlive.tar.gz http://mirror.ctan.org/systems/texlive/tlnet/install-tl-unx.tar.gz && \
+
+    # Untar it to $HOME/texlive
+    tar -xzf $HOME/texlive/texlive.tar.gz -C $HOME/texlive --strip-components=1 && \
+
+    # Run the installer
+    cd $HOME/texlive && ./install-tl --profile install.profile && \
+
+    # Remove $HOME/textlive and /tmp
+    rm -rf $HOME/texlive && \
+    rm -rf /tmp
+
+# Set TexLive paths
 ENV INFOPATH /usr/local/texlive/2015/texmf-dist/doc/info:$INFOPATH
 ENV INFOPATH /usr/local/texlive/2015/texmf-dist/doc/man:$MANPATH
 ENV PATH /usr/local/texlive/2015/bin/x86_64-linux:$PATH
 
-#
-# Install all the packages
-# This might take a while
-#
-
-RUN apt-get install -y python python-dev python-pip git tar fontconfig cpanminus libxml2-dev libxslt-dev libssl-dev libgdbm-dev liblwp-protocol-https-perl openjdk-7-jre-headless && \
-    apt-get clean
-
-#
-# Install lmh itself
-#
-RUN git clone https://github.com/KWARC/localmh /path/to/localmh; \
-    pip install beautifulsoup4 psutil pyapi-gitlab; \
-    ln -s /path/to/localmh/bin/lmh /usr/local/bin/lmh; \
-    lmh setup --install all
-
-# Install fonts
-# see KWARC/localmh#217
-RUN mkdir -p /usr/share/fonts/opentype/Fandol && \
-    mkdir -p /usr/share/fonts/truetype/cwTeX
+# Add the profile and fonts (for KWARC/localmh#217)
 ADD files/FandolFang-Regular.otf /usr/share/fonts/opentype/Fandol/
 ADD files/cwTeXQKai-Medium.ttf /usr/share/fonts/truetype/cwTeX/
 
-RUN fc-cache
+RUN echo "Updating TexLive Settings and fonts" && \
 
-# We need to change a few variables for sTeX to work.
-RUN echo "max_in_open = 50\nparam_size = 20000\nnest_size = 1000\nstack_size = 10000\n" >> $(kpsewhich texmf.cnf)
+    # Re-generate font cache
+    fc-cache && \
 
-# Set up some ssh agent magic.
-ADD files/sshag.sh $HOME/sshag.sh
+    # set special sTeX parameters
+    echo "max_in_open = 50\nparam_size = 20000\nnest_size = 1000\nstack_size = 10000\n" >> $(kpsewhich texmf.cnf)
 
 #
-# AND run nothing.
+# STEP 3: Pull lmh and install.
 #
-CMD /bin/bash -c "source ~/sshag.sh; tail -f /dev/null"
+
+ADD files/lmh /usr/local/bin/lmh
+
+RUN echo "Installing lmh" && \
+
+    # Clone it from github
+    git clone https://github.com/KWARC/localmh /path/to/localmh && \
+
+    # set the right permissions for /path/to/localmh
+    chmod a+rw /path/to/localmh/ && \
+
+    # Install pip dependencies (without cache)
+    pip3 install beautifulsoup4 psutil pyapi-gitlab && \
+
+    # Remove the python cache
+    rm -rf $HOME/.pip/cache/ && \
+
+    # Make the MathHub directory
+    mkdir -p /path/to/localmh/MathHub && \
+
+    # Run the setup process
+    lmh setup --install all
+
+#
+# STEP 4: INSTALL BINDFS MAGIC AND SET UP PERMISSIONS
+#
+
+RUN mkdir /tmp && \
+    apt-get update && \
+    apt-get install -y bindfs && \
+    apt-get clean && rm -rf /var/lib/apt/lists/* && \
+    mkdir -p /path/to/home && chmod a+rw /path/to/home/ && \
+    mkdir -p /path/to/home/.ssh && chmod a+rw /path/to/home/.ssh
+
+ADD files/localmh_init /sbin/localmh_init
+ADD files/sshag.sh /path/to/home/sshag.sh
+
+CMD ["/sbin/localmh_init"]
