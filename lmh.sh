@@ -163,7 +163,7 @@ function lmh_docker_create
     docker_localmh_mount="$LMH_ROOT_DIR:/mounted/lmh"
   fi;
 
-  $docker run --privileged=true -d --name $lmh_container_name -h $lmh_host_name -v "$docker_localmh_mount" -v "$LMH_SSH_DIR:/mounted/ssh" $lmh_docker_repo
+  $docker run --privileged=true -d --name $lmh_container_name -h $lmh_host_name -v "$docker_localmh_mount" -v "$LMH_SSH_DIR:/mounted/ssh" $lmh_docker_repo &> /dev/null
 
   # If we did not create it, then exit.
   if [ $? -ne 0 ]; then
@@ -188,7 +188,7 @@ function lmh_docker_create
   fi;
 
   # Step 3: Set up git.
-  printf "Configuring git settings ..."
+  printf "Configuring git settings ... "
 
   gitcfgs=( "user.name" "user.email")
 
@@ -196,7 +196,7 @@ function lmh_docker_create
   do
     git_cfg="$(git config --get $i)"
 
-    $docker exec -u $uid:$gid  $lmh_container_name /bin/bash -c "cd \$HOME && git config --system $i \"$git_cfg\""
+    $docker exec -u $uid:$gid  $lmh_container_name /bin/bash -c "cd \$HOME && git config --system $i \"$git_cfg\"" &> /dev/null
   done
 
   echo "Done. "
@@ -224,7 +224,7 @@ function lmh_docker_start
     exit 1;
   else
 
-    printf "Starting docker container..."
+    printf "Starting docker container ... "
 
     $docker start $lmh_container_name &> /dev/null
 
@@ -237,20 +237,30 @@ function lmh_docker_start
 
 
     echo "Done. "
-    echo "Remounting directories with correct permissions, please wait ..."
+    printf "Remounting directories with correct permissions, please wait ... "
     $docker exec $lmh_container_name /bin/bash -c "umount /path/to/home/.ssh; bindfs --perms=u+r $bindfs_commandline /mounted/ssh /path/to/home/.ssh" &> /dev/null
 
     if [ "$lmh_mode" == "content" ]; then
       $docker exec $lmh_container_name /bin/bash -c "umount /path/to/localmh/MathHub; bindfs -o nonempty --perms=a+rw $bindfs_commandline /mounted/lmh/MathHub /path/to/localmh/MathHub"  &> /dev/null;
+      $docker exec
     else
       $docker exec $lmh_container_name /bin/bash -c "umount /path/to/localmh; bindfs -o nonempty --perms=a+rw $bindfs_commandline /mounted/lmh /path/to/localmh"  &> /dev/null;
     fi;
 
     echo "Done. "
-    printf "Updating ssh keys, you might have to enter your password. "
+    printf "Linking directories ... "
+
+    if [ "$lmh_mode" == "content" ]; then
+      $docker exec $lmh_container_name /bin/bash -c "mkdir -p $(dirname $LMH_DATA_DIR); ln -s /path/to/localmh/MathHub $LMH_DATA_DIR";
+    else
+      $docker exec $lmh_container_name /bin/bash -c "mkdir -p $(dirname $LMH_ROOT_DIR); ln -s /path/to/localmh $LMH_ROOT_DIR";
+    fi;
+    echo "Done. "
+
+    echo "Registering ssh keys, you might have to enter your password. "
 
     # Run the ssh magic.
-    $docker exec -u $user_id:$group_id -t -i $lmh_container_name /bin/bash -c "export HOME=/path/to/home; source /path/to/home/sshag.sh; ssh-add; echo \"=======\"; ssh-add -l; "
+    $docker exec -u $user_id:$group_id -t -i $lmh_container_name /bin/bash -c "export HOME=/path/to/home; source /path/to/home/sshag.sh; ssh-add; echo \"The following ssh keys are available: \"; ssh-add -l; "
 
     # and we are done.
     echo "Done. "
@@ -314,8 +324,16 @@ function lmh_docker_delete
     exit 1;
   fi;
 
-  $docker rm $lmh_container_name
-  exit $?
+  printf "Deleting docker container ... "
+  $docker rm $lmh_container_name &> /dev/null
+
+  if [ $? -ne 0 ]; then
+    echo "Failed. "
+    exit 1;
+  else
+    echo "Done. "
+    exit 0;
+  fi;
 }
 
 
@@ -328,7 +346,7 @@ function lmh_docker_pull
   docker_machine_support
 
   # Pull the image
-  $docker pull $lmh_docker_repo .
+  $docker pull $lmh_docker_repo
 
   # exit with whatever code that gave.
   exit $?
@@ -374,7 +392,7 @@ function lmh_docker_shell
     exit 1;
   fi;
 
-  $docker exec -u $user_id:$group_id -t -i $lmh_container_name /bin/bash -c "export HOME=/path/to/home; export TERM=xterm; source /path/to/home/sshag.sh; /bin/bash"
+  $docker exec -u $user_id:$group_id -t -i $lmh_container_name /bin/bash -c "export HOME=/path/to/home; export TERM=xterm; source /path/to/home/sshag.sh; cd $lmh_pwd; /bin/bash"
 }
 
 #
@@ -399,7 +417,7 @@ function lmh_docker_sshell
     exit 1;
   fi;
 
-  $docker exec -t -i $lmh_container_name /bin/bash -c "export TERM=xterm; /bin/bash"
+  $docker exec -t -i $lmh_container_name /bin/bash -c "export TERM=xterm; cd $lmh_pwd; /bin/bash"
 }
 
 #
@@ -533,8 +551,24 @@ function lmh_docker()
 
 function lmh_()
 {
-    echo "OTHER"
-    echo "$@"
+  # Make sure docker_machine is running
+  docker_machine_support
+
+  if docker_container_exists; then
+    :
+  else
+    >&2 echo "Docker container does not exist, please create it using 'lmh docker create'. "
+    exit 1;
+  fi;
+
+  if docker_container_running; then
+    :
+  else
+    >&2 echo "Docker container is not running, please start it using 'lmh docker start'. "
+    exit 1;
+  fi;
+
+  $docker exec -u $user_id:$group_id -t -i $lmh_container_name /bin/bash -c "export HOME=/path/to/home; export TERM=xterm; source /path/to/home/sshag.sh; cd $lmh_pwd; lmh $@"
 }
 
 # Paths to executables
@@ -595,20 +629,17 @@ if [ -z "$lmh_mode" ]; then
 fi
 
 # Set current relative directory paths.
+lmh_pwd="$(pwd)"
 
 # for content mode, we go relative to the LMH_DATA_DIR
 if [ "$lmh_mode" == "content" ]; then
-  lmh_pwd="$(pwd)"
-  lmh_pwdcut="$(echo "$lmh_pwd" | cut -c 1-$((${#LMH_DATA_DIR})))"
-  if [[ "$LMH_DATA_DIR" != "$lmh_pwdcut" ]]; then
-    lmh_pwd="$LMH_DATA_DIR"
+  if [[ $lmh_pwd/ != $LMH_CONTENT_DIR/* ]]; then
+    lmh_pwd="$LMH_CONTENT_DIR";
   fi;
 # else we go relative to the root directory of lmh.
 else
-  lmh_pwd="$(pwd)"
-  lmh_pwdcut="$(echo "$lmh_pwd" | cut -c 1-$((${#LMH_ROOT_DIR})))"
-  if [[ "$LMH_ROOT_DIR" != "$lmh_pwdcut" ]]; then
-    lmh_pwd="$LMH_ROOT_DIR"
+  if [[ $lmh_pwd/ != $LMH_ROOT_DIR/* ]]; then
+    lmh_pwd="$LMH_ROOT_DIR";
   fi;
 fi;
 
