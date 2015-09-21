@@ -35,7 +35,7 @@ RUN echo "Installing TexLive 2015" && \
     mkdir -p /root/texlive/ && \
 
     # Grab the setup image
-    wget -nv -O /root/texlive/texlive.tar.gz http:/mirror.ctan.org/systems/texlive/tlnet/install-tl-unx.tar.gz && \
+    wget -nv -O /root/texlive/texlive.tar.gz http://mirror.ctan.org/systems/texlive/tlnet/install-tl-unx.tar.gz && \
 
     # Untar it to /root/texlive
     tar -xzf /root/texlive/texlive.tar.gz -C /root/texlive --strip-components=1 && \
