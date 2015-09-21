@@ -633,8 +633,8 @@ lmh_pwd="$(pwd)"
 
 # for content mode, we go relative to the LMH_DATA_DIR
 if [ "$lmh_mode" == "content" ]; then
-  if [[ $lmh_pwd/ != $LMH_CONTENT_DIR/* ]]; then
-    lmh_pwd="$LMH_CONTENT_DIR";
+  if [[ $lmh_pwd/ != $LMH_DATA_DIR/* ]]; then
+    lmh_pwd="$LMH_DATA_DIR";
   fi;
 # else we go relative to the root directory of lmh.
 else
