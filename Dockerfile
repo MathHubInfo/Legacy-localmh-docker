@@ -83,7 +83,7 @@ ADD files/lmh /usr/local/bin/lmh
 RUN echo "Installing lmh" && \
 
     # Clone it from github
-    git clone https:/github.com/KWARC/localmh /path/to/localmh && \
+    git clone https://github.com/KWARC/localmh /path/to/localmh && \
 
     # Install pip dependencies (without cache)
     pip3 install beautifulsoup4 psutil pyapi-gitlab && \
