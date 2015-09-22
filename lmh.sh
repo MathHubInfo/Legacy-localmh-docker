@@ -14,7 +14,7 @@ fi
 lmh_wrap_version="1.0.0"
 
 # Core
-lmh_docker_repo="kwarc/localmh:dev" # Docker repository for lmh.
+lmh_docker_repo="kwarc/localmh" # Docker repository for lmh.
 lmh_container_name="localmh_docker" # Name of lmh docker container
 lmh_machine_name="hostname" # Hostname of the machine
 lmh_user_name="user" # Name of the user

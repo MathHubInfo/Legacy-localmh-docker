@@ -10,7 +10,11 @@ The installation consists of 2 parts, installing docker and installing the wrapp
 
 ### Requirements
 
-The wrapper script depends only on bash, git and docker. If you want to use the localmh_docker script properly you will need some knowledge on how to set up environment variables, how to make them permanent and what your $PATH is.
+The wrapper script depends only on bash, git and docker 1.7+. If you want to use the localmh_docker script properly you will need some knowledge on how to set up environment variables, how to make them permanent and what your $PATH is.
+
+### Docker requirements
+* You need docker 1.7+ or the script will not work.
+* You need to be able to run docker without the use of sudo, as the script will not work as root.
 
 ### Installing docker
 
@@ -30,17 +34,47 @@ When installing docker, please install version 1.4 or newer. Instructions on how
 If you have installed lmh as above you can update by running:
 
 ```bash
-git pull # whereever you installed this repository
-lmh docker pull # pull the localmh_docker image
-lmh docker delete # delete the localmh_docker container
-lmh docker create # create the localmh_docker container
+git pull # wherever you cloned this repository to
+lmh docker pull # pull the new localmh_docker image
+lmh docker stop; lmh docker delete # stop and delete the container
+lmh docker create # re-create it.
 ```
 
 ```git pull``` in the path where you originally cloned this repository. Next you should run lmh core pullimag
 
 ## Managing the lmh docker container
 
+Accessing the $lmh_container_name:
 
+shell   Creates a (limited user) shell inside the $lmh_container_name container.
+sshell  Creates a root shell inside the $lmh_container_name container.
+
+Managing the $lmh_docker_repo docker image:
+
+pull    Pulls a new $lmh_docker_repo image from dockerhub.
+build   Builds the $lmh_docker_repo image locally.
+
+### Show container status
+
+Use the ```lmh docker status``` command to see the current status of the container.
+
+### Creating & Deleting the container
+
+Use the ```lmh docker create``` command to create a new container for the docker image. This can only be done if a container does not yet exist. Every time the docker image is updated you will need to create a new container. You will also have to create a new container if you want to change the mounted directories or the user account.
+
+You can delete a container using the ```lmh docker delete``` command. To delete a container it needs to be stopped first. Deleting a container can not be undone.
+
+### Starting & Stopping the container
+
+You can start and stop a container using the commands ```lmh docker start``` and ```lmh docker stop``` respectively. When you start a container, the SSH keys inside the container will need to be re-registered, so if your SSH keys are protected with a password you might have to re-enter it.
+
+### Working with the container
+You can directly use all ```lmh *``` commands without having to go into the docker container manually. They are run as a limited user inside the container. To use a command inside the docker container the container needs to be running.
+
+If you need a shell inside the docker container, you can use the command ```lmh docker shell``` to get a user-level shell. If you need root access use ```lmh docker sshell``` instead.
+
+### Working with the kwarc/localmh docker Image
+For convenience, ```localmh_docker``` provides the ```lmh docker build``` and ```lmh docker pull``` commands to re-build and pull the image. Please see the ```lmh docker --help``` command for more information.
 
 ## License
 
