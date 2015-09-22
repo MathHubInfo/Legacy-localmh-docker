@@ -242,7 +242,6 @@ function lmh_docker_start
 
     if [ "$lmh_mode" == "content" ]; then
       $docker exec $lmh_container_name /bin/bash -c "umount /path/to/localmh/MathHub; bindfs -o nonempty --perms=a+rw $bindfs_commandline /mounted/lmh/MathHub /path/to/localmh/MathHub"  &> /dev/null;
-      $docker exec
     else
       $docker exec $lmh_container_name /bin/bash -c "umount /path/to/localmh; bindfs -o nonempty --perms=a+rw $bindfs_commandline /mounted/lmh /path/to/localmh"  &> /dev/null;
     fi;
