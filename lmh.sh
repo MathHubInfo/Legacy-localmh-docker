@@ -102,7 +102,7 @@ function docker_ensure_running
 function lmh_docker_status
 {
   # Make sure docker_machine is running
-  docker_machine_support "off"
+  docker_machine_support
 
   # Is the container running?
   if docker_container_running; then
@@ -250,9 +250,9 @@ function lmh_docker_start
     printf "Linking directories ... "
 
     if [ "$lmh_mode" == "content" ]; then
-      $docker exec $lmh_container_name /bin/bash -c "mkdir -p $(dirname $LMH_DATA_DIR); ln -s /path/to/localmh/MathHub $LMH_DATA_DIR";
+      $docker exec $lmh_container_name /bin/bash -c "mkdir -p $(dirname $LMH_DATA_DIR); rm -f $LMH_DATA_DIR; ln -s /path/to/localmh/MathHub $LMH_DATA_DIR";
     else
-      $docker exec $lmh_container_name /bin/bash -c "mkdir -p $(dirname $LMH_ROOT_DIR); ln -s /path/to/localmh $LMH_ROOT_DIR";
+      $docker exec $lmh_container_name /bin/bash -c "mkdir -p $(dirname $LMH_ROOT_DIR); rm -f $LMH_ROOT_DIR; ln -s /path/to/localmh $LMH_ROOT_DIR";
     fi;
     echo "Done. "
 
@@ -568,7 +568,7 @@ function lmh_()
   fi;
 
   lmh_line="$@"
-  
+
   $docker exec -u $user_id:$group_id -t -i $lmh_container_name /bin/bash -c "export HOME=/path/to/home; export TERM=xterm; source /path/to/home/sshag.sh; cd $lmh_pwd;/usr/local/bin/lmh $lmh_line"
 
   exit $?
