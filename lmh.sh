@@ -251,9 +251,9 @@ function lmh_docker_start
     printf "Linking directories ... "
 
     if [ "$lmh_mode" == "content" ]; then
-      $docker exec $lmh_container_name /bin/bash -c "mkdir -p $(dirname $LMH_DATA_DIR); ln -s /path/to/localmh/MathHub $LMH_DATA_DIR";
+      $docker exec $lmh_container_name /bin/bash -c "mkdir -p $(dirname $LMH_DATA_DIR); rm -f $LMH_DATA_DIR; ln -s /path/to/localmh/MathHub $LMH_DATA_DIR";
     else
-      $docker exec $lmh_container_name /bin/bash -c "mkdir -p $(dirname $LMH_ROOT_DIR); ln -s /path/to/localmh $LMH_ROOT_DIR";
+      $docker exec $lmh_container_name /bin/bash -c "mkdir -p $(dirname $LMH_ROOT_DIR); rm -f $LMH_ROOT_DIR; ln -s /path/to/localmh $LMH_ROOT_DIR";
     fi;
     echo "Done. "
 
