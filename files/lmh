@@ -1,3 +1,3 @@
 #!/bin/bash
 
-python3 /path/to/localmh/bin/lmh $@
+python3 /path/to/localmh/bin/lmh "$@"

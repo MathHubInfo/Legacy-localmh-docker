@@ -568,7 +568,13 @@ function lmh_()
     exit 1;
   fi;
 
-  $docker exec -u $user_id:$group_id -t -i $lmh_container_name /bin/bash -c "export HOME=/path/to/home; export TERM=xterm; source /path/to/home/sshag.sh; cd $lmh_pwd; lmh $@"
+  lmh_line="$@"
+  
+  $docker exec -u $user_id:$group_id -t -i $lmh_container_name /bin/bash -c "export HOME=/path/to/home; export TERM=xterm; source /path/to/home/sshag.sh; cd $lmh_pwd;/usr/local/bin/lmh $lmh_line"
+
+  exit $?
+
+
 }
 
 # Paths to executables
@@ -647,7 +653,8 @@ fi;
 user_id="$(id -u)"
 group_id="$(id -g)"
 
-if [ "$1" == "core" ] || [ "$1" == "docker" ];
-  then lmh_docker "$@";
-  else lmh_ "$@";
+if [ "$1" == "core" ] || [ "$1" == "docker" ]; then
+  lmh_docker "$@";
+else
+  lmh_ "$@";
 fi;
