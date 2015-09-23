@@ -102,7 +102,7 @@ function docker_ensure_running
 function lmh_docker_status
 {
   # Make sure docker_machine is running
-  docker_machine_support "off"
+  docker_machine_support
 
   # Is the container running?
   if docker_container_running; then
@@ -569,7 +569,7 @@ function lmh_()
   fi;
 
   lmh_line="$@"
-  
+
   $docker exec -u $user_id:$group_id -t -i $lmh_container_name /bin/bash -c "export HOME=/path/to/home; export TERM=xterm; source /path/to/home/sshag.sh; cd $lmh_pwd;/usr/local/bin/lmh $lmh_line"
 
   exit $?
