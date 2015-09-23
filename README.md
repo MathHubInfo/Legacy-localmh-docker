@@ -44,16 +44,6 @@ lmh docker create # re-create it.
 
 ## Managing the lmh docker container
 
-Accessing the $lmh_container_name:
-
-shell   Creates a (limited user) shell inside the $lmh_container_name container.
-sshell  Creates a root shell inside the $lmh_container_name container.
-
-Managing the $lmh_docker_repo docker image:
-
-pull    Pulls a new $lmh_docker_repo image from dockerhub.
-build   Builds the $lmh_docker_repo image locally.
-
 ### Show container status
 
 Use the ```lmh docker status``` command to see the current status of the container.
