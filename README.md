@@ -22,12 +22,12 @@ When installing docker, please install version 1.4 or newer. Instructions on how
 
 ### Installing the localmh_docker script
 
-1) ```git clone``` this repository to an arbitrary path on your system
-2) Symlink ```lmh.sh``` into a folder that is in your PATH, for example: ```sudo ln -s lmh.sh  /usr/local/bin/lmh```
-3) You can install localmh in two ways:
-  3a) You want to develop the content managed by lmh only. In this case it is sufficient to make the ```MathHub``` directory available on the local system. For this purpose you should create a folder somewhere on your real machine and set the environment variable ```LMH_DATA_DIR``` to point to it.
-  3b) You want to develop lmh or any of the dependent software itself. In this case you should ```git clone``` the [KWARC/localmh](https://github.com/KWARC/localmh) repository to a folder of your choice and point to it using the ```LMH_ROOT_DIR``` variable.
-4) If you are using Docker-machine manager on Mac OS X, you should set the ```LMH_DOCKER_MACHINE``` environment variable to the name of the VM you are using. Note that the default machine name is ```default```.
+1. ```git clone``` this repository to an arbitrary path on your system
+2. Symlink ```lmh.sh``` into a folder that is in your PATH, for example: ```sudo ln -s lmh.sh  /usr/local/bin/lmh```
+3. You can install localmh in two ways:
+  1. You want to develop the content managed by lmh only. In this case it is sufficient to make the ```MathHub``` directory available on the local system. For this purpose you should create a folder somewhere on your real machine and set the environment variable ```LMH_DATA_DIR``` to point to it.
+  2. You want to develop lmh or any of the dependent software itself. In this case you should ```git clone``` the [KWARC/localmh](https://github.com/KWARC/localmh) repository to a folder of your choice and point to it using the ```LMH_ROOT_DIR``` variable.
+4. If you are using Docker-machine manager on Mac OS X, you should set the ```LMH_DOCKER_MACHINE``` environment variable to the name of the VM you are using. Note that the default machine name is ```default```.
 
 ## Update
 
