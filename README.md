@@ -6,19 +6,21 @@ This repository contains a [Docker](https://www.docker.com/) Image for [localmh]
 
 ## Installation
 
-The installation consists of 2 parts, installing docker and installing the wrapper script.
+The installation consists of 2 parts, installing dependencies and installing the wrapper script.
 
 ### Requirements
 
-The wrapper script depends only on bash, git and docker 1.7+. If you want to use the localmh_docker script properly you will need some knowledge on how to set up environment variables, how to make them permanent and what your $PATH is.
+The wrapper script depends only on bash, git, realpath and docker 1.7+. If you want to use the localmh_docker script properly you will need some knowledge on how to set up environment variables, how to make them permanent and what your $PATH is.
 
 ### Docker requirements
 * You need docker 1.7+ or the script will not work.
 * You need to be able to run docker without the use of sudo, as the script will not work as root.
 
-### Installing docker
+### Installing docker, git & realpath
 
-When installing docker, please install version 1.4 or newer. Instructions on how to install docker are not covered here, but they can be found in [the offical Docker Installation Guide](https://docs.docker.com/installation/). On Mac OS X it is neccessary to Docker Manager (or a similar script) to manage docker. If you are using that script, please have the docker-machine vm name ready during th installation of lmh.
+1. Docker. When installing docker, please install version 1.4 or newer. Instructions on how to install docker are not covered here, but they can be found in [the offical Docker Installation Guide](https://docs.docker.com/installation/). On Mac OS X it is neccessary to Docker Manager (or a similar script) to manage docker. If you are using that script, please have the docker-machine vm name ready during the installation of lmh.
+2. Git. You will need to have git installed and in your $PATH. Make sure that the command ```which git``` print the path to your git executable
+3. Realpath. Make sure the command ```which realpath``` prints the path to an executable. If this does not work you will have to install it seperatly. On Debian-based systems, this is done via ```sudo apt-get install realpath```, on Mac OS X you can use homebrew: ```brew tap iveney/mocha; brew install realpath```. 
 
 ### Installing the localmh_docker script
 
