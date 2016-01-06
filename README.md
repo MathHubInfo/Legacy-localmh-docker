@@ -13,7 +13,7 @@ The installation consists of 2 parts, installing dependencies and installing the
 The wrapper script depends only on bash, git, realpath and docker 1.7+. If you want to use the localmh_docker script properly you will need some knowledge on how to set up environment variables, how to make them permanent and what your $PATH is.
 
 ### Docker requirements
-* You need docker 1.7+ or the script will not work.
+* You need docker 1.7+ or the script may not work.
 * You need to be able to run docker without the use of sudo, as the script will not work as root.
 
 ### Installing docker, git & realpath
@@ -41,8 +41,6 @@ lmh docker pull # pull the new localmh_docker image
 lmh docker stop; lmh docker delete # stop and delete the container
 lmh docker create # re-create it.
 ```
-
-```git pull``` in the path where you originally cloned this repository. Next you should run lmh core pullimag
 
 ## Managing the lmh docker container
 

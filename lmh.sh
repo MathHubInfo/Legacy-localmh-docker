@@ -7,11 +7,11 @@ if ! [ -n "$BASH_VERSION" ]; then
 fi
 
 #
-# (c) 2015 the KWARC group <kwarc.info>
+# (c) 2015-16 the KWARC group <kwarc.info>
 #
 
 # Self
-lmh_wrap_version="1.0.0"
+lmh_wrap_version="1.0.1"
 
 # Core
 lmh_docker_repo="kwarc/localmh" # Docker repository for lmh.
