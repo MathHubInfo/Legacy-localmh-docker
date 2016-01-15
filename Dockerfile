@@ -86,7 +86,7 @@ RUN echo "Installing lmh" && \
     git clone https://github.com/KWARC/localmh /path/to/localmh && \
 
     # Install pip dependencies (without cache)
-    pip3 install beautifulsoup4 psutil pyapi-gitlab && \
+    pip3 install lxml psutil pyapi-gitlab && \
 
     # Remove the python cache
     rm -rf /root/.pip/cache/ && \
