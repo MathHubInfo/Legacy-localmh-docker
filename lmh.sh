@@ -42,7 +42,7 @@ function cleanup_directory()
 }
 
 # Code to properly configure users and environment for docker
-# starts docker_machine if enabled. 
+# starts docker_machine if enabled.
 function docker_user_support
 {
   # Run docker machine code if we support it.
@@ -52,7 +52,7 @@ function docker_user_support
   else
     docker_exec_args=""
     lmh_exec_bashargs="export HOME=/root";
-    
+
     docker_machine_status="$($docker_machine status $LMH_DOCKER_MACHINE 2> /dev/null)"
 
     # If docker machine is not started, we want to start it.
@@ -176,13 +176,12 @@ function lmh_docker_create
   fi;
 
   echo "Done. "
-  
-  # Step 2: Create an appropriate user if we are not boot2docker
-  if [ -z "$LMH_DOCKER_MACHINE" ]; then
-    printf "Creating user and group inside docker container ... "
 
-    
-  
+  # Step 2: Create an appropriate user if we are not boot2docker
+  printf "Creating user and group inside docker container ... "
+
+  if [ -z "$LMH_DOCKER_MACHINE" ]; then
+
     $docker exec $lmh_container_name /bin/bash -c "chown $user_id:$group_id /path/to/home; groupadd -g $group_id $lmh_group_name 2> /dev/null; groupmod -n $lmh_group_name \$(getent group 20 | cut -d: -f1) ; useradd -d /path/to/home -p $lmh_user_name -u $user_id -g $group_id user; " &> /dev/null
 
     # If we did not create it, then exit.
@@ -193,8 +192,7 @@ function lmh_docker_create
       echo "Done. "
     fi;
   else
-    printf "Creating user and group inside docker container ... "
-    $docker exec $lmh_container_name /bin/bash -c "chown $user_id:$group_id /path/to/home; groupadd -g $group_id $lmh_group_name 2> /dev/null; groupmod -n $lmh_group_name \$(getent group 20 | cut -d: -f1) ; useradd -d /path/to/home -p $lmh_user_name -u $user_id -g $group_id user; " &> /dev/null
+    echo "Skipped. "
   fi;
 
   # Step 3: Set up git
@@ -247,9 +245,9 @@ function lmh_docker_start
 
 
     echo "Done. "
-    
+
     printf "Mounting and linking directories, please wait ... "
-    
+
     if [ -z "$LMH_DOCKER_MACHINE" ]; then
       # if we are not boot2docker, we need to remount with bindfs
       $docker exec $lmh_container_name /bin/bash -c "umount /path/to/home/.ssh; bindfs --perms=u+r $bindfs_commandline /mounted/ssh /path/to/home/.ssh" &> /dev/null
@@ -261,16 +259,16 @@ function lmh_docker_start
       fi;
     else
       # in boot2docker permissions will just work, so we can just link them
-      
-      $docker exec $lmh_container_name /bin/bash -c "ln -s /mounted/ssh /root/.ssh"  &> /dev/null;
-      
+
+      $docker exec $lmh_container_name /bin/bash -c "ln -sf /mounted/ssh /root/.ssh"  &> /dev/null;
+
       if [ "$lmh_mode" == "content" ]; then
-        $docker exec $lmh_container_name /bin/bash -c "rm /path/to/localmh/MathHub; ln -s /mounted/lmh/MathHub /path/to/localmh/MathHub"  &> /dev/null;
+        $docker exec $lmh_container_name /bin/bash -c "rm -rf /path/to/localmh/MathHub; ln -sf /mounted/lmh/MathHub /path/to/localmh/MathHub"  &> /dev/null;
       else
-        $docker exec $lmh_container_name /bin/bash -c "rm /path/to/localmh; ln -s /mounted/lmh /path/to/localmh"  &> /dev/null;
+        $docker exec $lmh_container_name /bin/bash -c "rm -rf /path/to/localmh; ln -sf /mounted/lmh /path/to/localmh"  &> /dev/null;
       fi;
     fi;
-    
+
     # Link in the real paths
     if [ "$lmh_mode" == "content" ]; then
       $docker exec $lmh_container_name /bin/bash -c "mkdir -p $(dirname $LMH_DATA_DIR); rm -f $LMH_DATA_DIR; ln -s /path/to/localmh/MathHub $LMH_DATA_DIR";
@@ -307,21 +305,20 @@ function lmh_docker_stop
   # Container is running, can not stop.
   if docker_container_running; then
     printf "Unmounting directories ... "
-    
+
     if [ -z "$LMH_DOCKER_MACHINE" ]; then
       # on non-boot2docker situations we need to unbind /path/to
       $docker exec -t -i  $lmh_container_name /bin/bash -c 'umount /path/to/localmh; umount /path/to/localmh/MathHub; umount /path/to/home/.ssh; ' &> /dev/null;
     else
       # in boot2docker we need to remove the right directories
       if [ "$lmh_mode" == "content" ]; then
-        $docker exec -t -i  $lmh_container_name /bin/bash -c 'rm /path/to/localmh/MathHub; umount /path/to/home/.ssh; ' &> /dev/null;
+        $docker exec -t -i  $lmh_container_name /bin/bash -c 'rm /path/to/localmh/MathHub; rm /root/.ssh; ' &> /dev/null;
       else
-        $docker exec -t -i  $lmh_container_name /bin/bash -c 'rm /path/to/localmh; umount /path/to/home/.ssh; ' &> /dev/null;
+        $docker exec -t -i  $lmh_container_name /bin/bash -c 'rm /path/to/localmh; rm /root/.ssh; ' &> /dev/null;
       fi;
-      
-      
-    fi; 
-    
+
+    fi;
+
     echo "Done. "
 
     printf "Stopping docker container ... "
