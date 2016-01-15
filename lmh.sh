@@ -299,8 +299,21 @@ function lmh_docker_stop
   # Container is running, can not stop.
   if docker_container_running; then
     printf "Unmounting directories ... "
-    $docker exec -t -i  $lmh_container_name /bin/bash -c 'umount /path/to/localmh; umount /path/to/localmh/MathHub; umount /path/to/home/.ssh; ' &> /dev/null
-
+    
+    if [ -z "$LMH_DOCKER_MACHINE" ]; then
+      # on non-boot2docker situations we need to unbind /path/to
+      $docker exec -t -i  $lmh_container_name /bin/bash -c 'umount /path/to/localmh; umount /path/to/localmh/MathHub; umount /path/to/home/.ssh; ' &> /dev/null;
+    else
+      # in boot2docker we need to remove the right directories
+      if [ "$lmh_mode" == "content" ]; then
+        $docker exec -t -i  $lmh_container_name /bin/bash -c 'rm /path/to/localmh/MathHub; umount /path/to/home/.ssh; ' &> /dev/null;
+      else
+        $docker exec -t -i  $lmh_container_name /bin/bash -c 'rm /path/to/localmh; umount /path/to/home/.ssh; ' &> /dev/null;
+      fi;
+      
+      
+    fi; 
+    
     echo "Done. "
 
     printf "Stopping docker container ... "
