@@ -47,9 +47,11 @@ function docker_user_support
 {
   # Run docker machine code if we support it.
   if [ -z "$LMH_DOCKER_MACHINE" ]; then
-    docker_exec_args="-u $user_id:$group_id"; 
+    docker_exec_args="-u $user_id:$group_id"
+    lmh_exec_bashargs="export HOME=/path/to/home"
   else
     docker_exec_args=""
+    lmh_exec_bashargs="export HOME=/root";
     
     docker_machine_status="$($docker_machine status $LMH_DOCKER_MACHINE 2> /dev/null)"
 
@@ -190,6 +192,9 @@ function lmh_docker_create
     else
       echo "Done. "
     fi;
+  else
+    printf "Creating user and group inside docker container ... "
+    $docker exec $lmh_container_name /bin/bash -c "chown $user_id:$group_id /path/to/home; groupadd -g $group_id $lmh_group_name 2> /dev/null; groupmod -n $lmh_group_name \$(getent group 20 | cut -d: -f1) ; useradd -d /path/to/home -p $lmh_user_name -u $user_id -g $group_id user; " &> /dev/null
   fi;
 
   # Step 3: Set up git
@@ -256,6 +261,9 @@ function lmh_docker_start
       fi;
     else
       # in boot2docker permissions will just work, so we can just link them
+      
+      $docker exec $lmh_container_name /bin/bash -c "ln -s /mounted/ssh /root/.ssh"  &> /dev/null;
+      
       if [ "$lmh_mode" == "content" ]; then
         $docker exec $lmh_container_name /bin/bash -c "rm /path/to/localmh/MathHub; ln -s /mounted/lmh/MathHub /path/to/localmh/MathHub"  &> /dev/null;
       else
@@ -274,7 +282,7 @@ function lmh_docker_start
     echo "Registering ssh keys, you might have to enter your password. "
 
     # Run the ssh magic.
-    $docker exec $docker_exec_args -t -i $lmh_container_name /bin/bash -c "export HOME=/path/to/home; source /path/to/home/sshag.sh; ssh-add; echo \"The following ssh keys are available: \"; ssh-add -l; "
+    $docker exec $docker_exec_args -t -i $lmh_container_name /bin/bash -c "$lmh_exec_bashargs; source /path/to/home/sshag.sh; ssh-add; echo \"The following ssh keys are available: \"; ssh-add -l; "
 
     # and we are done.
     echo "Done. "
@@ -419,7 +427,7 @@ function lmh_docker_shell
     exit 1;
   fi;
 
-  $docker exec $docker_exec_args -t -i $lmh_container_name /bin/bash -c "export HOME=/path/to/home; export TERM=xterm; source /path/to/home/sshag.sh; cd $lmh_pwd; /bin/bash"
+  $docker exec $docker_exec_args -t -i $lmh_container_name /bin/bash -c "$lmh_exec_bashargs; export TERM=xterm; source /path/to/home/sshag.sh; cd $lmh_pwd; /bin/bash"
 }
 
 #
@@ -597,7 +605,7 @@ function lmh_()
 
   lmh_line="$@"
 
-  $docker exec $docker_exec_args -t -i $lmh_container_name /bin/bash -c "export HOME=/path/to/home; export TERM=xterm; source /path/to/home/sshag.sh; cd $lmh_pwd;/usr/local/bin/lmh $lmh_line"
+  $docker exec $docker_exec_args -t -i $lmh_container_name /bin/bash -c "$lmh_exec_bashargs; export TERM=xterm; source /path/to/home/sshag.sh; cd $lmh_pwd;/usr/local/bin/lmh $lmh_line"
 
   exit $?
 
