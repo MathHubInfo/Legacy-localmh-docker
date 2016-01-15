@@ -11,7 +11,7 @@ fi
 #
 
 # Self
-lmh_wrap_version="1.0.1"
+lmh_wrap_version="1.1.0"
 
 # Core
 lmh_docker_repo="kwarc/localmh" # Docker repository for lmh.
@@ -41,13 +41,16 @@ function cleanup_directory()
   echo "$1" | $sed -e 's/\/*$//g'
 }
 
-# Code to autostart docker-machine VM
-# Unused on Linux.
-function docker_machine_support
+# Code to properly configure users and environment for docker
+# starts docker_machine if enabled. 
+function docker_user_support
 {
   # Run docker machine code if we support it.
-  if [ -z "$LMH_DOCKER_MACHINE" ]; then : ; else
-
+  if [ -z "$LMH_DOCKER_MACHINE" ]; then
+    docker_exec_args="-u $user_id:$group_id"; 
+  else
+    docker_exec_args=""
+    
     docker_machine_status="$($docker_machine status $LMH_DOCKER_MACHINE 2> /dev/null)"
 
     # If docker machine is not started, we want to start it.
@@ -83,7 +86,7 @@ function docker_ensure_running
 {
 
   # Start the docker machine if available.
-  docker_machine_support
+  docker_user_support
 
   if docker_container_running; then
     return 0;
@@ -102,7 +105,7 @@ function docker_ensure_running
 function lmh_docker_status
 {
   # Make sure docker_machine is running
-  docker_machine_support
+  docker_user_support
 
   # Is the container running?
   if docker_container_running; then
@@ -143,7 +146,7 @@ function lmh_docker_status
 function lmh_docker_create
 {
   # Make sure we have a docker machine.
-  docker_machine_support
+  docker_user_support
 
   # if the docker container already exists, exit.
   if docker_container_exists; then
@@ -152,8 +155,6 @@ function lmh_docker_create
   fi;
 
   printf "Creating and starting docker container ... "
-
-
 
   # Step 1: Create a docker container and run nothing in it.
 
@@ -173,21 +174,25 @@ function lmh_docker_create
   fi;
 
   echo "Done. "
+  
+  # Step 2: Create an appropriate user if we are not boot2docker
+  if [ -z "$LMH_DOCKER_MACHINE" ]; then
+    printf "Creating user and group inside docker container ... "
 
-  printf "Creating user and group inside docker container ... "
+    
+  
+    $docker exec $lmh_container_name /bin/bash -c "chown $user_id:$group_id /path/to/home; groupadd -g $group_id $lmh_group_name 2> /dev/null; groupmod -n $lmh_group_name \$(getent group 20 | cut -d: -f1) ; useradd -d /path/to/home -p $lmh_user_name -u $user_id -g $group_id user; " &> /dev/null
 
-  # Step 2: Create an appropriate user.
-  $docker exec $lmh_container_name /bin/bash -c "chown $user_id:$group_id /path/to/home; groupadd -g $group_id $lmh_group_name 2> /dev/null; groupmod -n $lmh_group_name \$(getent group 20 | cut -d: -f1) ; useradd -d /path/to/home -p $lmh_user_name -u $user_id -g $group_id user; " &> /dev/null
-
-  # If we did not create it, then exit.
-  if [ $? -ne 0 ]; then
-    echo "Failed. "
-    >&2 echo "Warning: Unable to create user and group. ";
-  else
-    echo "Done. "
+    # If we did not create it, then exit.
+    if [ $? -ne 0 ]; then
+      echo "Failed. "
+      >&2 echo "Warning: Unable to create user and group. ";
+    else
+      echo "Done. "
+    fi;
   fi;
 
-  # Step 3: Set up git.
+  # Step 3: Set up git
   printf "Configuring git settings ... "
 
   gitcfgs=( "user.name" "user.email")
@@ -196,7 +201,7 @@ function lmh_docker_create
   do
     git_cfg="$(git config --get $i)"
 
-    $docker exec -u $uid:$gid  $lmh_container_name /bin/bash -c "cd \$HOME && git config --system $i \"$git_cfg\"" &> /dev/null
+    $docker exec $docker_exec_args  $lmh_container_name /bin/bash -c "cd \$HOME && git config --system $i \"$git_cfg\"" &> /dev/null
   done
 
   echo "Done. "
@@ -208,7 +213,7 @@ function lmh_docker_create
 function lmh_docker_start
 {
   # Make sure docker_machine is running.
-  docker_machine_support
+  docker_user_support
 
   # If it does not exist there is nothing to stop.
   if docker_container_exists; then
@@ -237,18 +242,28 @@ function lmh_docker_start
 
 
     echo "Done. "
-    printf "Remounting directories with correct permissions, please wait ... "
-    $docker exec $lmh_container_name /bin/bash -c "umount /path/to/home/.ssh; bindfs --perms=u+r $bindfs_commandline /mounted/ssh /path/to/home/.ssh" &> /dev/null
+    
+    printf "Mounting and linking directories, please wait ... "
+    
+    if [ -z "$LMH_DOCKER_MACHINE" ]; then
+      # if we are not boot2docker, we need to remount with bindfs
+      $docker exec $lmh_container_name /bin/bash -c "umount /path/to/home/.ssh; bindfs --perms=u+r $bindfs_commandline /mounted/ssh /path/to/home/.ssh" &> /dev/null
 
-    if [ "$lmh_mode" == "content" ]; then
-      $docker exec $lmh_container_name /bin/bash -c "umount /path/to/localmh/MathHub; bindfs -o nonempty --perms=a+rw $bindfs_commandline /mounted/lmh/MathHub /path/to/localmh/MathHub"  &> /dev/null;
+      if [ "$lmh_mode" == "content" ]; then
+        $docker exec $lmh_container_name /bin/bash -c "umount /path/to/localmh/MathHub; bindfs -o nonempty --perms=a+rw $bindfs_commandline /mounted/lmh/MathHub /path/to/localmh/MathHub"  &> /dev/null;
+      else
+        $docker exec $lmh_container_name /bin/bash -c "umount /path/to/localmh; bindfs -o nonempty --perms=a+rw $bindfs_commandline /mounted/lmh /path/to/localmh"  &> /dev/null;
+      fi;
     else
-      $docker exec $lmh_container_name /bin/bash -c "umount /path/to/localmh; bindfs -o nonempty --perms=a+rw $bindfs_commandline /mounted/lmh /path/to/localmh"  &> /dev/null;
+      # in boot2docker permissions will just work, so we can just link them
+      if [ "$lmh_mode" == "content" ]; then
+        $docker exec $lmh_container_name /bin/bash -c "rm /path/to/localmh/MathHub; ln -s /mounted/lmh/MathHub /path/to/localmh/MathHub"  &> /dev/null;
+      else
+        $docker exec $lmh_container_name /bin/bash -c "rm /path/to/localmh; ln -s /mounted/lmh /path/to/localmh"  &> /dev/null;
+      fi;
     fi;
-
-    echo "Done. "
-    printf "Linking directories ... "
-
+    
+    # Link in the real paths
     if [ "$lmh_mode" == "content" ]; then
       $docker exec $lmh_container_name /bin/bash -c "mkdir -p $(dirname $LMH_DATA_DIR); rm -f $LMH_DATA_DIR; ln -s /path/to/localmh/MathHub $LMH_DATA_DIR";
     else
@@ -259,7 +274,7 @@ function lmh_docker_start
     echo "Registering ssh keys, you might have to enter your password. "
 
     # Run the ssh magic.
-    $docker exec -u $user_id:$group_id -t -i $lmh_container_name /bin/bash -c "export HOME=/path/to/home; source /path/to/home/sshag.sh; ssh-add; echo \"The following ssh keys are available: \"; ssh-add -l; "
+    $docker exec $docker_exec_args -t -i $lmh_container_name /bin/bash -c "export HOME=/path/to/home; source /path/to/home/sshag.sh; ssh-add; echo \"The following ssh keys are available: \"; ssh-add -l; "
 
     # and we are done.
     echo "Done. "
@@ -271,7 +286,7 @@ function lmh_docker_start
 function lmh_docker_stop
 {
   # Make sure docker_machine is running.
-  docker_machine_support
+  docker_user_support
 
   # If it does not exist there is nothing to stop.
   if docker_container_exists; then
@@ -307,7 +322,7 @@ function lmh_docker_stop
 function lmh_docker_delete
 {
   # Make sure docker_machine is running.
-  docker_machine_support
+  docker_user_support
 
   # If it does not exist there is nothing to delete.
   if docker_container_exists; then
@@ -342,7 +357,7 @@ function lmh_docker_delete
 function lmh_docker_pull
 {
   # Make sure docker_machine is running
-  docker_machine_support
+  docker_user_support
 
   # Pull the image
   $docker pull $lmh_docker_repo
@@ -357,7 +372,7 @@ function lmh_docker_pull
 function lmh_docker_build
 {
   # Make sure docker_machine is running
-  docker_machine_support
+  docker_user_support
 
   # cd into the lmh script path.
   cd $lmh_script_path
@@ -375,7 +390,7 @@ function lmh_docker_build
 function lmh_docker_shell
 {
   # Make sure docker_machine is running
-  docker_machine_support
+  docker_user_support
 
   if docker_container_exists; then
     :
@@ -391,7 +406,7 @@ function lmh_docker_shell
     exit 1;
   fi;
 
-  $docker exec -u $user_id:$group_id -t -i $lmh_container_name /bin/bash -c "export HOME=/path/to/home; export TERM=xterm; source /path/to/home/sshag.sh; cd $lmh_pwd; /bin/bash"
+  $docker exec $docker_exec_args -t -i $lmh_container_name /bin/bash -c "export HOME=/path/to/home; export TERM=xterm; source /path/to/home/sshag.sh; cd $lmh_pwd; /bin/bash"
 }
 
 #
@@ -400,7 +415,7 @@ function lmh_docker_shell
 function lmh_docker_sshell
 {
   # Make sure docker_machine is running
-  docker_machine_support
+  docker_user_support
 
   if docker_container_exists; then
     :
@@ -551,7 +566,7 @@ function lmh_docker()
 function lmh_()
 {
   # Make sure docker_machine is running
-  docker_machine_support
+  docker_user_support
 
   if docker_container_exists; then
     :
@@ -569,7 +584,7 @@ function lmh_()
 
   lmh_line="$@"
 
-  $docker exec -u $user_id:$group_id -t -i $lmh_container_name /bin/bash -c "export HOME=/path/to/home; export TERM=xterm; source /path/to/home/sshag.sh; cd $lmh_pwd;/usr/local/bin/lmh $lmh_line"
+  $docker exec $docker_exec_args -t -i $lmh_container_name /bin/bash -c "export HOME=/path/to/home; export TERM=xterm; source /path/to/home/sshag.sh; cd $lmh_pwd;/usr/local/bin/lmh $lmh_line"
 
   exit $?
 
