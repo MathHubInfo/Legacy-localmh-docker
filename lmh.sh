@@ -11,7 +11,7 @@ fi
 #
 
 # Self
-lmh_wrap_version="1.1.0"
+lmh_wrap_version="1.2.0"
 
 # Core
 lmh_docker_repo="kwarc/localmh" # Docker repository for lmh.

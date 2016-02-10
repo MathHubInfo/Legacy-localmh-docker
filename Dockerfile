@@ -8,7 +8,15 @@ MAINTAINER Tom Wiesing <tkw01536@gmail.com>
 ENV TERM xterm
 
 #
-# STEP 1: INSTALL APT-GET PACKAGES
+# STEP 1: Setting locales
+#
+RUN locale-gen en_US.UTF-8
+ENV LANG en_US.UTF-8
+ENV LANGUAGE en_US:en
+ENV LC_ALL en_US.UTF-8
+
+#
+# STEP 2: INSTALL APT-GET PACKAGES
 #
 RUN echo "Installing apt-get packages" && \
 
@@ -17,14 +25,38 @@ RUN echo "Installing apt-get packages" && \
     apt-get dist-upgrade -y && \
 
     # Install all the required dependencies
-    apt-get install -y wget perl python3 python3-dev python3-pip git tar fontconfig cpanminus libxml2-dev libxslt-dev libssl-dev libgdbm-dev liblwp-protocol-https-perl perlmagick openjdk-7-jre-headless bindfs && \
+    apt-get install -y wget perl python3 python3-dev python3-pip git tar fontconfig cpanminus libxml2-dev libxslt-dev libssl-dev libgdbm-dev liblwp-protocol-https-perl perlmagick openjdk-7-jre-headless bindfs vim && \
 
     # Clear apt-get caches to save space
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
+#
+# STEP 3: INSTALL GIT LFS
+#
+RUN echo "Install git-lfs" && \
+
+    # Create git lfs dir
+    mkdir -p /root/gitlfs/ && \
+
+    # Grab the script
+    wget -nv -O /root/gitlfs/script.deb.sh https://packagecloud.io/install/repositories/github/git-lfs/script.deb.sh  && \
+
+    # make it executable
+    chmod +x /root/gitlfs/script.deb.sh && \
+
+    bash /root/gitlfs/script.deb.sh
+    # Install the packages
+    apt-get install -y git-lfs && \
+
+    # Clear apt-get caches to save space
+    apt-get clean && rm -rf /var/lib/apt/lists/* && \
+
+    # Run the install script
+
+
 
 #
-# STEP 2: Install TexLive + Fonts
+# STEP 3: Install TexLive + Fonts
 #
 
 ADD files/install.profile /root/texlive/install.profile
