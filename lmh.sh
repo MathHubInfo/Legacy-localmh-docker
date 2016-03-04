@@ -259,7 +259,7 @@ function lmh_docker_start
       fi;
     else
       # in boot2docker ssh permissions need to be remounted
-      $docker exec $lmh_container_name /bin/bash -c "umount /path/to/home/.ssh; bindfs --perms=u+r -u root -g root /mounted/ssh /root/.ssh" &> /dev/null
+      $docker exec $lmh_container_name /bin/bash -c "umount /root/.ssh; mkdir -p /root/.ssh; bindfs --perms=u+r -u root -g root /mounted/ssh /root/.ssh" &> /dev/null
       
       # but all the other stuff will still work
       if [ "$lmh_mode" == "content" ]; then
