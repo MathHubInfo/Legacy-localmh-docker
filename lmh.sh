@@ -258,10 +258,10 @@ function lmh_docker_start
         $docker exec $lmh_container_name /bin/bash -c "umount /path/to/localmh; bindfs -o nonempty --perms=a+rw $bindfs_commandline /mounted/lmh /path/to/localmh"  &> /dev/null;
       fi;
     else
-      # in boot2docker permissions will just work, so we can just link them
-
-      $docker exec $lmh_container_name /bin/bash -c "ln -sf /mounted/ssh /root/.ssh"  &> /dev/null;
-
+      # in boot2docker ssh permissions need to be remounted
+      $docker exec $lmh_container_name /bin/bash -c "umount /path/to/home/.ssh; bindfs --perms=u+r $bindfs_commandline /mounted/ssh /root/.ssh" &> /dev/null
+      
+      # but all the other stuff will still work
       if [ "$lmh_mode" == "content" ]; then
         $docker exec $lmh_container_name /bin/bash -c "rm -rf /path/to/localmh/MathHub; ln -sf /mounted/lmh/MathHub /path/to/localmh/MathHub"  &> /dev/null;
       else
@@ -312,9 +312,9 @@ function lmh_docker_stop
     else
       # in boot2docker we need to remove the right directories
       if [ "$lmh_mode" == "content" ]; then
-        $docker exec -t -i  $lmh_container_name /bin/bash -c 'rm /path/to/localmh/MathHub; rm /root/.ssh; ' &> /dev/null;
+        $docker exec -t -i  $lmh_container_name /bin/bash -c 'rm /path/to/localmh/MathHub; umount /root/.ssh; ' &> /dev/null;
       else
-        $docker exec -t -i  $lmh_container_name /bin/bash -c 'rm /path/to/localmh; rm /root/.ssh; ' &> /dev/null;
+        $docker exec -t -i  $lmh_container_name /bin/bash -c 'rm /path/to/localmh; umount /root/.ssh; ' &> /dev/null;
       fi;
 
     fi;
