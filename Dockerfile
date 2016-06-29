@@ -20,7 +20,7 @@ RUN echo "Installing apt-get packages" && \
     apt-get install -y wget perl python3 python3-dev python3-pip git tar fontconfig cpanminus libxml2-dev libxslt-dev libssl-dev libgdbm-dev liblwp-protocol-https-perl perlmagick openjdk-7-jre-headless bindfs && \
 
     # Clear apt-get caches to save space
-    apt-get clean && rm -rf /var/lib/apt/lists/*
+    apt-get clean trang && rm -rf /var/lib/apt/lists/*
 
 
 #
