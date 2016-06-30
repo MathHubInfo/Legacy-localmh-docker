@@ -13,11 +13,30 @@ ENV TERM xterm
 RUN echo "Installing apt-get packages" && \
 
     # Pull package lists and upgrade existing packages.
+    apt-get clean && \
     apt-get update && \
     apt-get dist-upgrade -y && \
 
     # Install all the required dependencies
-    apt-get install -y wget perl python3 python3-dev python3-pip git tar fontconfig cpanminus libxml2-dev libxslt-dev libssl-dev libgdbm-dev liblwp-protocol-https-perl perlmagick openjdk-7-jre-headless bindfs && \
+    apt-get install -y \
+    bindfs \
+    cpanminus \
+    fontconfig \
+    git \
+    libgdbm-dev \
+    liblwp-protocol-https-perl \
+    libssl-dev \
+    libxml2-dev \
+    libxslt-dev \
+    openjdk-7-jre-headless \
+    perl \
+    perlmagick \
+    python3 \
+    python3-dev \
+    python3-pip \
+    tar \
+    trang \
+    wget && \
 
     # Clear apt-get caches to save space
     apt-get clean && rm -rf /var/lib/apt/lists/*
